@@ -1,12 +1,11 @@
 from fastapi import FastAPI
-from app.routers import health
+from app.core.config import settings
+from app.routers import pqrs
 
-# Inicialización de la aplicación FastAPI
-app = FastAPI(
-    title="PQRS Intelligent Triage API",
-    description="Módulo inteligente para clasificación y direccionamiento de PQRS",
-    version="0.1.0"
-)
+app = FastAPI(title=settings.PROJECT_NAME)
 
-# Conectar el router de health a la app principal
-app.include_router(health.router)
+app.include_router(pqrs.router, prefix=settings.API_V1_STR)
+
+@app.get("/")
+def read_root():
+    return {"estado": "ok", "mensaje": "API de Triaje PQRS operativa"}
