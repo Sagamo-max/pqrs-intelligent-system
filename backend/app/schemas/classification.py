@@ -1,16 +1,16 @@
 from pydantic import BaseModel, Field
 from typing import Literal
 
-class PQRSClassification(BaseModel):
-    tipo_pqrs: Literal["Peticion", "Queja", "Reclamo", "Sugerencia"] = Field(
-        description="Clasificación principal según la intención del usuario."
+class TicketClassification(BaseModel):
+    ticket_type: Literal["Peticion", "Queja", "Reclamo", "Sugerencia"] = Field(
+        description="Primary classification based on the user's intent."
     )
-    prioridad: Literal["Alta", "Media", "Baja"] = Field(
-        description="Nivel de urgencia. Reclamos suelen ser Alta, sugerencias Baja."
+    priority: Literal["Alta", "Media", "Baja"] = Field(
+        description="Urgency level. Claims are usually high priority and suggestions low priority."
     )
-    area_responsable: str = Field(
-        description="Área de la empresa que debe resolver la solicitud (ej. Servicio al Cliente, Facturación, Soporte Técnico)."
+    responsible_area: str = Field(
+        description="Company department responsible for resolving the request."
     )
-    justificacion_decision: str = Field(
-        description="Explicación obligatoria y concisa de por qué se asignó este tipo, prioridad y área. Sirve para auditoría."
+    decision_justification: str = Field(
+        description="Required concise explanation for the selected type, priority, and department. Used for auditing."
     )
