@@ -7,28 +7,28 @@ from sqlalchemy.orm import relationship
 from app.core.database import Base
 
 
-class PQRSType(str, enum.Enum):
+class TicketType(str, enum.Enum):
     PETITION = "PETITION"
     COMPLAINT = "COMPLAINT"
     CLAIM = "CLAIM"
     SUGGESTION = "SUGGESTION"
 
 
-class PQRSPriority(str, enum.Enum):
+class TicketPriority(str, enum.Enum):
     HIGH = "HIGH"
     MEDIUM = "MEDIUM"
     LOW = "LOW"
 
 
-class PQRSStatus(str, enum.Enum):
+class TicketStatus(str, enum.Enum):
     RECEIVED = "RECEIVED"
     IN_PROGRESS = "IN_PROGRESS"
     RESOLVED = "RESOLVED"
     CLOSED = "CLOSED"
 
 
-class PQRSTicket(Base):
-    __tablename__ = "pqrs_tickets"
+class Ticket(Base):
+    __tablename__ = "tickets"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     claimant_id = Column(UUID(as_uuid=True), ForeignKey("claimants.id", ondelete="RESTRICT"), nullable=False, index=True)
@@ -37,9 +37,9 @@ class PQRSTicket(Base):
     tracking_number = Column(String(30), unique=True, nullable=False, index=True)
     original_text = Column(Text, nullable=False)
 
-    ticket_type = Column(SQLEnum(PQRSType, name="pqrs_type_enum"), nullable=False, index=True)
-    priority = Column(SQLEnum(PQRSPriority, name="pqrs_priority_enum"), nullable=False, default=PQRSPriority.MEDIUM)
-    status = Column(SQLEnum(PQRSStatus, name="pqrs_status_enum"), nullable=False, default=PQRSStatus.RECEIVED)
+    ticket_type = Column(SQLEnum(TicketType, name="ticket_type_enum"), nullable=False, index=True)
+    priority = Column(SQLEnum(TicketPriority, name="ticket_priority_enum"), nullable=False, default=TicketPriority.MEDIUM)
+    status = Column(SQLEnum(TicketStatus, name="ticket_status_enum"), nullable=False, default=TicketStatus.RECEIVED)
 
     filing_date = Column(Date, server_default=func.current_date(), nullable=False)
     due_date = Column(Date, nullable=False, index=True)

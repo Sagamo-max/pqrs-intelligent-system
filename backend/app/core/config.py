@@ -4,13 +4,14 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "PQRS Intelligent Triage API"
+    PROJECT_NAME: str = "Ticket Intelligent Triage API"
     API_V1_STR: str = "/api/v1"
     
     POSTGRES_PASSWORD: str
     
-    AI_PROVIDER: str = "Chatgpt"
+    AI_PROVIDER: str = "openai"
     AI_API_KEY: str
+    AI_MODEL_NAME: str
 
     @computed_field
     @property
@@ -22,7 +23,7 @@ class Settings(BaseSettings):
                 password=self.POSTGRES_PASSWORD,
                 host="localhost",
                 port=5432,
-                path="pqrs_db",
+                path="ticket_db",
             )
         )
 

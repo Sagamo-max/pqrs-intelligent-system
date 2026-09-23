@@ -1,11 +1,12 @@
 from fastapi import FastAPI
 from app.core.config import settings
-from app.routers import pqrs
+from app.routers import ticket, health
 
 app = FastAPI(title=settings.PROJECT_NAME)
 
-app.include_router(pqrs.router, prefix=settings.API_V1_STR)
+app.include_router(health.router)
+app.include_router(ticket.router, prefix=settings.API_V1_STR)
 
 @app.get("/")
 def read_root():
-    return {"estado": "ok", "mensaje": "API de Triaje PQRS operativa"}
+    return {"status": "ok", "message": "Ticket triage API operational"}

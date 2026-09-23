@@ -1,8 +1,8 @@
-"""create_initial_pqrs_schema
+"""Initial ticket schema
 
-Revision ID: 99039b2b752c
+Revision ID: 6e820bd17449
 Revises: 
-Create Date: 2026-09-11 17:23:07.987267
+Create Date: 2026-09-23 15:54:34.137113
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = '99039b2b752c'
+revision: str = '6e820bd17449'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -47,15 +47,15 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_departments_code'), 'departments', ['code'], unique=True)
     op.create_index(op.f('ix_departments_id'), 'departments', ['id'], unique=False)
-    op.create_table('pqrs_tickets',
+    op.create_table('tickets',
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('claimant_id', sa.UUID(), nullable=False),
     sa.Column('department_id', sa.UUID(), nullable=True),
     sa.Column('tracking_number', sa.String(length=30), nullable=False),
     sa.Column('original_text', sa.Text(), nullable=False),
-    sa.Column('ticket_type', sa.Enum('PETITION', 'COMPLAINT', 'CLAIM', 'SUGGESTION', name='pqrs_type_enum'), nullable=False),
-    sa.Column('priority', sa.Enum('HIGH', 'MEDIUM', 'LOW', name='pqrs_priority_enum'), nullable=False),
-    sa.Column('status', sa.Enum('RECEIVED', 'IN_PROGRESS', 'RESOLVED', 'CLOSED', name='pqrs_status_enum'), nullable=False),
+    sa.Column('ticket_type', sa.Enum('PETITION', 'COMPLAINT', 'CLAIM', 'SUGGESTION', name='ticket_type_enum'), nullable=False),
+    sa.Column('priority', sa.Enum('HIGH', 'MEDIUM', 'LOW', name='ticket_priority_enum'), nullable=False),
+    sa.Column('status', sa.Enum('RECEIVED', 'IN_PROGRESS', 'RESOLVED', 'CLOSED', name='ticket_status_enum'), nullable=False),
     sa.Column('filing_date', sa.Date(), server_default=sa.text('CURRENT_DATE'), nullable=False),
     sa.Column('due_date', sa.Date(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
@@ -64,27 +64,27 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['department_id'], ['departments.id'], ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_index(op.f('ix_pqrs_tickets_claimant_id'), 'pqrs_tickets', ['claimant_id'], unique=False)
-    op.create_index(op.f('ix_pqrs_tickets_department_id'), 'pqrs_tickets', ['department_id'], unique=False)
-    op.create_index(op.f('ix_pqrs_tickets_due_date'), 'pqrs_tickets', ['due_date'], unique=False)
-    op.create_index(op.f('ix_pqrs_tickets_id'), 'pqrs_tickets', ['id'], unique=False)
-    op.create_index(op.f('ix_pqrs_tickets_ticket_type'), 'pqrs_tickets', ['ticket_type'], unique=False)
-    op.create_index(op.f('ix_pqrs_tickets_tracking_number'), 'pqrs_tickets', ['tracking_number'], unique=True)
+    op.create_index(op.f('ix_tickets_claimant_id'), 'tickets', ['claimant_id'], unique=False)
+    op.create_index(op.f('ix_tickets_department_id'), 'tickets', ['department_id'], unique=False)
+    op.create_index(op.f('ix_tickets_due_date'), 'tickets', ['due_date'], unique=False)
+    op.create_index(op.f('ix_tickets_id'), 'tickets', ['id'], unique=False)
+    op.create_index(op.f('ix_tickets_ticket_type'), 'tickets', ['ticket_type'], unique=False)
+    op.create_index(op.f('ix_tickets_tracking_number'), 'tickets', ['tracking_number'], unique=True)
     op.create_table('ai_audits',
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('ticket_id', sa.UUID(), nullable=False),
     sa.Column('ai_model', sa.String(length=50), nullable=False),
     sa.Column('provider', sa.String(length=20), nullable=False),
     sa.Column('decision_justification', sa.Text(), nullable=False),
-    sa.Column('suggested_type', sa.Enum('PETITION', 'COMPLAINT', 'CLAIM', 'SUGGESTION', name='pqrs_type_enum'), nullable=False),
-    sa.Column('suggested_priority', sa.Enum('HIGH', 'MEDIUM', 'LOW', name='pqrs_priority_enum'), nullable=False),
+    sa.Column('suggested_type', sa.Enum('PETITION', 'COMPLAINT', 'CLAIM', 'SUGGESTION', name='ticket_type_enum'), nullable=False),
+    sa.Column('suggested_priority', sa.Enum('HIGH', 'MEDIUM', 'LOW', name='ticket_priority_enum'), nullable=False),
     sa.Column('suggested_department_code', sa.String(length=20), nullable=False),
     sa.Column('confidence', sa.Float(), nullable=True),
     sa.Column('tokens_used', sa.Integer(), nullable=True),
     sa.Column('latency_ms', sa.Integer(), nullable=True),
     sa.Column('raw_response', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.ForeignKeyConstraint(['ticket_id'], ['pqrs_tickets.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['ticket_id'], ['tickets.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_ai_audits_id'), 'ai_audits', ['id'], unique=False)
@@ -99,7 +99,7 @@ def upgrade() -> None:
     sa.Column('new_value', sa.Text(), nullable=False),
     sa.Column('change_reason', sa.Text(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.ForeignKeyConstraint(['ticket_id'], ['pqrs_tickets.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['ticket_id'], ['tickets.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_change_audits_id'), 'change_audits', ['id'], unique=False)
@@ -116,13 +116,13 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_ai_audits_ticket_id'), table_name='ai_audits')
     op.drop_index(op.f('ix_ai_audits_id'), table_name='ai_audits')
     op.drop_table('ai_audits')
-    op.drop_index(op.f('ix_pqrs_tickets_tracking_number'), table_name='pqrs_tickets')
-    op.drop_index(op.f('ix_pqrs_tickets_ticket_type'), table_name='pqrs_tickets')
-    op.drop_index(op.f('ix_pqrs_tickets_id'), table_name='pqrs_tickets')
-    op.drop_index(op.f('ix_pqrs_tickets_due_date'), table_name='pqrs_tickets')
-    op.drop_index(op.f('ix_pqrs_tickets_department_id'), table_name='pqrs_tickets')
-    op.drop_index(op.f('ix_pqrs_tickets_claimant_id'), table_name='pqrs_tickets')
-    op.drop_table('pqrs_tickets')
+    op.drop_index(op.f('ix_tickets_tracking_number'), table_name='tickets')
+    op.drop_index(op.f('ix_tickets_ticket_type'), table_name='tickets')
+    op.drop_index(op.f('ix_tickets_id'), table_name='tickets')
+    op.drop_index(op.f('ix_tickets_due_date'), table_name='tickets')
+    op.drop_index(op.f('ix_tickets_department_id'), table_name='tickets')
+    op.drop_index(op.f('ix_tickets_claimant_id'), table_name='tickets')
+    op.drop_table('tickets')
     op.drop_index(op.f('ix_departments_id'), table_name='departments')
     op.drop_index(op.f('ix_departments_code'), table_name='departments')
     op.drop_table('departments')

@@ -18,4 +18,4 @@ class Claimant(Base):
     phone = Column(String(25), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
-    tickets = relationship("PQRSTicket", back_populates="claimant", cascade="all, delete-orphan")
+    tickets = relationship("Ticket", back_populates="claimant", cascade="all, delete-orphan")
