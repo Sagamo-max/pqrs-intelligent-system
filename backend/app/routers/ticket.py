@@ -7,6 +7,8 @@ from app.schemas.ticket import TicketCreate, TicketResponse
 from app.services.ticket_service import create_ticket
 from app.core.database import get_db
 from app.services.claimant_service import get_or_create_claimant
+from app.services.audit_service import create_ai_audit
+from app.services.sanitizer_service import sanitize_text
 
 router = APIRouter(prefix="/pqrs", tags=["Tickets"])
 
@@ -32,13 +34,21 @@ def submit_ticket(request: TicketCreate, db: Session = Depends(get_db)):
             claimant_id=claimant.id
         )
         
-        ai_payload = ticket.original_text
+        raw_text = ticket.original_text
         
-        print(f"\n--- ISOLATED PAYLOAD FOR AI ---\n{ai_payload}\n-------------------------------\n")
+        sanitized_payload = sanitize_text(raw_text)
         
-        classification = classify_ticket_text(ai_payload)
+        print(f"\n--- SANITIZED PAYLOAD FOR AI ---\n{sanitized_payload}\n--------------------------------\n")
         
-        print(f"AI Classification Result: {classification}")
+        classification = classify_ticket_text(sanitized_payload)
+        
+        create_ai_audit(
+            db=db,
+            ticket_id=ticket.id,
+            classification_data=classification.model_dump(),
+            original_text=raw_text,
+            sanitized_text=sanitized_payload
+        )
         
         return TicketResponse(
             ticket_number=ticket.tracking_number,

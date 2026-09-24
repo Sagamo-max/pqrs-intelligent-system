@@ -16,6 +16,9 @@ class AIAudit(Base):
     ai_model = Column(String(50), nullable=False)
     provider = Column(String(20), nullable=False)
 
+    original_text = Column(Text, nullable=False)
+    sanitized_text = Column(Text, nullable=False)
+
     decision_justification = Column(Text, nullable=False)
 
     suggested_type = Column(SQLEnum(TicketType, name="ticket_type_enum", create_type=False), nullable=False)

@@ -1,14 +1,15 @@
 from pydantic import BaseModel, Field
-from typing import Literal
+from app.models.ticket import TicketType, TicketPriority
 
 class TicketClassification(BaseModel):
-    ticket_type: Literal["Peticion", "Queja", "Reclamo", "Sugerencia"] = Field(
+    ticket_type: TicketType = Field(
         description="Primary classification based on the user's intent."
     )
-    priority: Literal["Alta", "Media", "Baja"] = Field(
+    priority: TicketPriority = Field(
         description="Urgency level. Claims are usually high priority and suggestions low priority."
     )
     responsible_area: str = Field(
+        max_length=20,
         description="Company department responsible for resolving the request."
     )
     decision_justification: str = Field(
