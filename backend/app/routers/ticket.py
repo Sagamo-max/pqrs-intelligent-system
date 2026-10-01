@@ -15,12 +15,17 @@ router = APIRouter(prefix="/pqrs", tags=["Tickets"])
 class TicketClassificationRequest(BaseModel):
     text: str
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 @router.post("/classify-poc", response_model=TicketClassification)
 def classify_ticket(payload: TicketClassificationRequest):
     try:
         return classify_ticket_text(payload.text)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Classification failed: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/", response_model=TicketResponse, status_code=201)
@@ -56,4 +61,5 @@ def submit_ticket(request: TicketCreate, db: Session = Depends(get_db)):
         )
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to submit ticket: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
