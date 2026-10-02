@@ -1,26 +1,23 @@
 from openai import OpenAI
+from tenacity import retry, stop_after_attempt, wait_exponential
 from app.core.config import settings
 from app.schemas.classification import TicketClassification
-
 
 client_options = {"api_key": settings.OPENAI_API_KEY}
 if settings.AI_BASE_URL:
     client_options["base_url"] = settings.AI_BASE_URL
-
+    
 client = OpenAI(**client_options)
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 def classify_ticket_text(text: str) -> TicketClassification:
-    """
-    Sends sanitized text to the LLM for classification using the
-    TicketClassification schema.
-    """
     system_prompt = (
         "You are an expert agent in corporate triage and Colombian legislation (Law 1755). "
         "Your only task is to analyze the user text and classify the request "
         "strictly in the requested JSON format. Be objective and analytical. "
-        "Use the exact Spanish enum values defined by the response schema."
+        "Use the exact English enum values defined by the response schema."
     )
-
+    
     response = client.beta.chat.completions.parse(
         model=settings.AI_MODEL_NAME,
         messages=[
@@ -29,5 +26,5 @@ def classify_ticket_text(text: str) -> TicketClassification:
         ],
         response_format=TicketClassification,
     )
-
+    
     return response.choices[0].message.parsed

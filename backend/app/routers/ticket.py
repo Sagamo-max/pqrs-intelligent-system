@@ -1,6 +1,8 @@
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
+import logging
+
 from app.services.classifier import classify_ticket_text
 from app.schemas.classification import TicketClassification
 from app.schemas.ticket import TicketCreate, TicketResponse
@@ -9,15 +11,13 @@ from app.core.database import get_db
 from app.services.claimant_service import get_or_create_claimant
 from app.services.audit_service import create_ai_audit
 from app.services.sanitizer_service import sanitize_text
+from app.models.ticket import TicketType, TicketPriority
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/pqrs", tags=["Tickets"])
 
 class TicketClassificationRequest(BaseModel):
     text: str
-
-import logging
-
-logger = logging.getLogger(__name__)
 
 @router.post("/classify-poc", response_model=TicketClassification)
 def classify_ticket(payload: TicketClassificationRequest):
@@ -26,7 +26,6 @@ def classify_ticket(payload: TicketClassificationRequest):
     except Exception as e:
         logger.error(f"Classification failed: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
-
 
 @router.post("/", response_model=TicketResponse, status_code=201)
 def submit_ticket(request: TicketCreate, db: Session = Depends(get_db)):
@@ -39,14 +38,30 @@ def submit_ticket(request: TicketCreate, db: Session = Depends(get_db)):
             claimant_id=claimant.id
         )
         
-        raw_text = ticket.original_text
-        
-        sanitized_payload = sanitize_text(raw_text)
-        
-        print(f"\n--- SANITIZED PAYLOAD FOR AI ---\n{sanitized_payload}\n--------------------------------\n")
-        
+        db.commit()
+        db.refresh(ticket)
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to persist PQRS to database: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+    raw_text = ticket.original_text
+    sanitized_payload = sanitize_text(raw_text)
+
+    print(f"\n--- SANITIZED PAYLOAD FOR AI ---\n{sanitized_payload}\n--------------------------------\n")
+
+    try:
         classification = classify_ticket_text(sanitized_payload)
-        
+    except Exception as ai_error:
+        logger.error(f"AI Classification completely failed for ticket {ticket.id}: {ai_error}")
+        classification = TicketClassification(
+            ticket_type=TicketType.PETITION,
+            priority=TicketPriority.HIGH,
+            responsible_area="DEFAULT_OPS",
+            decision_justification="AUTOMATED FALLBACK: AI service unavailable after retries. Assigned default safe configuration."
+        )
+
+    try:
         create_ai_audit(
             db=db,
             ticket_id=ticket.id,
@@ -54,12 +69,10 @@ def submit_ticket(request: TicketCreate, db: Session = Depends(get_db)):
             original_text=raw_text,
             sanitized_text=sanitized_payload
         )
-        
-        return TicketResponse(
-            ticket_number=ticket.tracking_number,
-            status=ticket.status.value if hasattr(ticket.status, 'value') else str(ticket.status)
-        )
-    except Exception as e:
-        db.rollback()
-        logger.error(f"Failed to submit ticket: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+    except Exception as audit_error:
+        logger.error(f"Failed to save AI audit for ticket {ticket.id}: {audit_error}")
+
+    return TicketResponse(
+        ticket_number=ticket.tracking_number,
+        status=ticket.status.value if hasattr(ticket.status, 'value') else str(ticket.status)
+    )
