@@ -3,7 +3,11 @@ from app.core.config import settings
 from app.schemas.classification import TicketClassification
 
 
-client = OpenAI(api_key=settings.AI_API_KEY)
+client_options = {"api_key": settings.OPENAI_API_KEY}
+if settings.AI_BASE_URL:
+    client_options["base_url"] = settings.AI_BASE_URL
+
+client = OpenAI(**client_options)
 
 def classify_ticket_text(text: str) -> TicketClassification:
     """
