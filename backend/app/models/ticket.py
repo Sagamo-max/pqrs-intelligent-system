@@ -32,7 +32,7 @@ class Ticket(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     claimant_id = Column(UUID(as_uuid=True), ForeignKey("claimants.id", ondelete="RESTRICT"), nullable=False, index=True)
-    department_id = Column(UUID(as_uuid=True), ForeignKey("departments.id", ondelete="RESTRICT"), nullable=True, index=True)
+    area_id = Column(UUID(as_uuid=True), ForeignKey("areas.id", ondelete="RESTRICT"), nullable=True, index=True)
 
     tracking_number = Column(String(30), unique=True, nullable=False, index=True)
     original_text = Column(Text, nullable=False)
@@ -48,6 +48,6 @@ class Ticket(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
     claimant = relationship("Claimant", back_populates="tickets")
-    department = relationship("Department", back_populates="tickets")
+    area = relationship("Area", back_populates="tickets")
     ai_audit = relationship("AIAudit", back_populates="ticket", uselist=False, cascade="all, delete-orphan")
     change_audits = relationship("ChangeAudit", back_populates="ticket", cascade="all, delete-orphan")

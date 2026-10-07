@@ -23,7 +23,7 @@ class AIAudit(Base):
 
     suggested_type = Column(SQLEnum(TicketType, name="ticket_type_enum", create_type=False), nullable=False)
     suggested_priority = Column(SQLEnum(TicketPriority, name="ticket_priority_enum", create_type=False), nullable=False)
-    suggested_department_code = Column(String(20), nullable=False)
+    suggested_area_code = Column(String(50), nullable=False)
 
     confidence = Column(Float, nullable=True)
     tokens_used = Column(Integer, nullable=True)

@@ -1,23 +1,24 @@
-from fastapi import APIRouter, HTTPException, Depends
-from sqlalchemy.orm import Session
-from pydantic import BaseModel
 import logging
 
-from app.services.classifier import classify_ticket_text
+from pydantic import BaseModel
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+
+from app.core.database import get_db
 from app.schemas.classification import TicketClassification
 from app.schemas.ticket import TicketCreate, TicketResponse
-from app.services.ticket_service import create_ticket
-from app.core.database import get_db
 from app.services.claimant_service import get_or_create_claimant
-from app.services.audit_service import create_ai_audit
-from app.services.sanitizer_service import sanitize_text
-from app.models.ticket import TicketType, TicketPriority
+from app.services.classifier import classify_ticket_text
+from app.services.ticket_service import create_ticket
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/pqrs", tags=["Tickets"])
 
+
 class TicketClassificationRequest(BaseModel):
     text: str
+
 
 @router.post("/classify-poc", response_model=TicketClassification)
 def classify_ticket(payload: TicketClassificationRequest):
@@ -27,52 +28,21 @@ def classify_ticket(payload: TicketClassificationRequest):
         logger.error(f"Classification failed: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
-@router.post("/", response_model=TicketResponse, status_code=201)
+
+@router.post("/", response_model=TicketResponse, status_code=status.HTTP_201_CREATED)
 def submit_ticket(request: TicketCreate, db: Session = Depends(get_db)):
     try:
         claimant = get_or_create_claimant(db=db, claimant_data=request.claimant)
-        
+
         ticket = create_ticket(
-            db=db, 
-            free_text=request.free_text, 
-            claimant_id=claimant.id
+            db=db,
+            free_text=request.free_text,
+            claimant_id=claimant.id,
         )
-        
-        db.commit()
-        db.refresh(ticket)
+
+        return TicketResponse.model_validate(ticket)
+
     except Exception as e:
         db.rollback()
-        logger.error(f"Failed to persist PQRS to database: {e}")
+        logger.exception(f"Failed to create PQRS: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
-
-    raw_text = ticket.original_text
-    sanitized_payload = sanitize_text(raw_text)
-
-    print(f"\n--- SANITIZED PAYLOAD FOR AI ---\n{sanitized_payload}\n--------------------------------\n")
-
-    try:
-        classification = classify_ticket_text(sanitized_payload)
-    except Exception as ai_error:
-        logger.error(f"AI Classification completely failed for ticket {ticket.id}: {ai_error}")
-        classification = TicketClassification(
-            ticket_type=TicketType.PETITION,
-            priority=TicketPriority.HIGH,
-            responsible_area="DEFAULT_OPS",
-            decision_justification="AUTOMATED FALLBACK: AI service unavailable after retries. Assigned default safe configuration."
-        )
-
-    try:
-        create_ai_audit(
-            db=db,
-            ticket_id=ticket.id,
-            classification_data=classification.model_dump(),
-            original_text=raw_text,
-            sanitized_text=sanitized_payload
-        )
-    except Exception as audit_error:
-        logger.error(f"Failed to save AI audit for ticket {ticket.id}: {audit_error}")
-
-    return TicketResponse(
-        ticket_number=ticket.tracking_number,
-        status=ticket.status.value if hasattr(ticket.status, 'value') else str(ticket.status)
-    )

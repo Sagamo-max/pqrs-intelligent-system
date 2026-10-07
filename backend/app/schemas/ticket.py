@@ -1,5 +1,9 @@
 import re
-from pydantic import BaseModel, Field, field_validator
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.schemas.area import AreaOut
+
 
 class ClaimantCreate(BaseModel):
     full_name: str = Field(..., min_length=3)
@@ -16,6 +20,7 @@ class ClaimantCreate(BaseModel):
             raise ValueError("Invalid email format provided")
         return v
 
+
 class TicketCreate(BaseModel):
     claimant: ClaimantCreate
     free_text: str
@@ -27,9 +32,16 @@ class TicketCreate(BaseModel):
         if not clean_text:
             raise ValueError("Free text cannot be empty or just whitespace")
         if len(clean_text) < 15:
-            raise ValueError("Free text must contain at least 15 meaningful characters to be processed")
+            raise ValueError(
+                "Free text must contain at least 15 meaningful characters to be processed"
+            )
         return clean_text
 
+
+
 class TicketResponse(BaseModel):
-    ticket_number: str
+    model_config = ConfigDict(from_attributes=True)
+
+    tracking_number: str
     status: str
+    area: AreaOut | None = None
