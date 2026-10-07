@@ -1,15 +1,15 @@
-from app.models.claimant import Claimant
-from app.models.department import Department
-from app.models.ticket import Ticket, TicketType, TicketPriority, TicketStatus
+from app.models.area import Area
 from app.models.audit import AIAudit, ChangeAudit
+from app.models.claimant import Claimant
+from app.models.ticket import Ticket, TicketPriority, TicketStatus, TicketType
 
 __all__ = [
+    "Area",
+    "AIAudit",
+    "ChangeAudit",
     "Claimant",
-    "Department",
     "Ticket",
     "TicketType",
     "TicketPriority",
     "TicketStatus",
-    "AIAudit",
-    "ChangeAudit",
 ]
