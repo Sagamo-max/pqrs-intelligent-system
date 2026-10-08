@@ -190,3 +190,16 @@ El servicio SLA actual devuelve la fecha de hoy más 15 días calendario, indepe
 - El clasificador está acoplado al cliente de OpenAI aunque existe `AI_PROVIDER` en configuración.
 - Las excepciones se devuelven en el detalle HTTP y el flujo de creación realiza varios commits antes de completar todo el proceso.
 - `spacy.load("es_core_news_sm")` exige que el modelo de idioma esté instalado antes de importar el sanitizador.
+
+## Pruebas Automatizadas (Testing)
+
+El sistema cuenta con una suite completa de pruebas unitarias y de integración desarrolladas con `pytest`, las cuales aíslan las llamadas a OpenAI y utilizan transacciones de rollback para no alterar la base de datos de pruebas.
+
+Para ejecutar la suite localmente:
+```powershell
+pip install pytest pytest-cov pytest-mock httpx
+# Es requisito configurar una base de datos de PostgreSQL aislada para los tests:
+$env:TEST_DATABASE_URL="postgresql://usuario:password@localhost:5432/ticket_db_test"
+pytest
+```
+Consulta el archivo [backend/tests/README.md](tests/README.md) para más detalles.
