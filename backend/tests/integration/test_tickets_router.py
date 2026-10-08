@@ -48,6 +48,14 @@ def test_reuse_claimant(client, seed_areas, sample_ticket_payload, mock_openai_c
 
 @pytest.mark.integration
 def test_ticket_creation_is_atomic(client, sample_ticket_payload, seed_areas, mocker, db_session):
+    from app.services.classifier import ClassificationOutcome, FALLBACK_CLASSIFICATION
+    mocker.patch("app.services.ticket_service.classify_ticket_text", return_value=ClassificationOutcome(
+        classification=FALLBACK_CLASSIFICATION,
+        raw_response=None,
+        tokens_used=None,
+        latency_ms=None,
+        confidence=None
+    ))
     mocker.patch("app.services.ticket_service.create_ai_audit", side_effect=Exception("DB failure"))
     
     try:

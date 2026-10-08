@@ -67,6 +67,7 @@ def test_classifier_retries_on_validation_error(mocker):
     mock_message.message.parsed = None
     mock_response = MagicMock()
     mock_response.choices = [mock_message]
+    mock_response.model_dump.return_value = {"mock": "data"}
     mock_client.beta.chat.completions.parse.return_value = mock_response
 
     mocker.patch("time.sleep")
@@ -87,6 +88,7 @@ def test_classifier_system_prompt(mocker):
     )
     mock_response = MagicMock()
     mock_response.choices = [mock_message]
+    mock_response.model_dump.return_value = {"mock": "data"}
     mock_client.beta.chat.completions.parse.return_value = mock_response
 
     classify_ticket_text("Test text")

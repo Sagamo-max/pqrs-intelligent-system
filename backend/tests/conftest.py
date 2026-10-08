@@ -28,7 +28,7 @@ def db_session(db_engine):
     connection = db_engine.connect()
     transaction = connection.begin()
     
-    Session = sessionmaker(bind=connection)
+    Session = sessionmaker(bind=connection, join_transaction_mode="create_savepoint")
     session = Session()
     
     yield session
