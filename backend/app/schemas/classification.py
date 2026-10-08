@@ -1,6 +1,6 @@
 from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.models.ticket import TicketPriority, TicketType
 
@@ -29,5 +29,20 @@ class TicketClassification(BaseModel):
         description="Area from the official catalog responsible for resolving the request."
     )
     decision_justification: str = Field(
-        description="Required concise explanation for the selected type, priority, and area. Used for auditing."
+        min_length=10,
+        max_length=500,
+        description=(
+            "Required concise explanation (at least 10 characters) for the selected "
+            "type, priority, and area. Used for auditing."
+        ),
     )
+
+    @field_validator("decision_justification")
+    @classmethod
+    def not_blank(cls, v: str) -> str:
+        stripped = v.strip()
+        if not stripped:
+            raise ValueError("decision_justification cannot be empty or whitespace")
+        if len(stripped) < 10:
+            raise ValueError("decision_justification must be at least 10 characters")
+        return stripped
