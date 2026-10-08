@@ -13,7 +13,7 @@ from app.services.classifier import ClassificationOutcome
 from app.models.ticket import TicketType, TicketPriority
 
 # Postgres required due to postgresql.UUID and JSONB in models
-TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL", "postgresql://postgres:admin@localhost:5432/ticket_db")
+TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL", "postgresql+psycopg://postgres:admin@localhost:5432/ticket_db")
 
 @pytest.fixture(scope="session")
 def db_engine():
