@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.models.ticket import Ticket, TicketStatus
 from app.services.area_service import resolve_area
-from app.services.audit_service import create_ai_audit
+from app.services.audit_service import create_ai_audit, create_audit_attempts
 from app.services.classifier import classify_ticket_text
 from app.services.sanitizer_service import sanitize_text
 from app.services.sla import calculate_due_date
@@ -45,6 +45,12 @@ def create_ticket(db: Session, free_text: str, claimant_id) -> Ticket:
             outcome=outcome,
             original_text=free_text,
             sanitized_text=sanitized_text,
+        )
+
+        create_audit_attempts(
+            db=db,
+            ticket_id=ticket.id,
+            attempts=outcome.attempts,
         )
 
         db.commit()

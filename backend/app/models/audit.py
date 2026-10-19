@@ -29,6 +29,7 @@ class AIAudit(Base):
     tokens_used = Column(Integer, nullable=True)
     latency_ms = Column(Integer, nullable=True)
     raw_response = Column(JSONB, nullable=True)
+    classification_source = Column(String(20), nullable=False, server_default="openai")
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     ticket = relationship("Ticket", back_populates="ai_audit")
