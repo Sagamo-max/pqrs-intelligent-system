@@ -1,7 +1,15 @@
 import pytest
 from app.models.ticket import Ticket
 from app.models.audit import AIAudit
+from app.models.audit_attempt import AIAuditAttempt
 from app.models.claimant import Claimant
+from app.models.ticket import TicketPriority, TicketType
+from app.schemas.classification import AreaCode, TicketClassification
+from app.services.classifier import (
+    AttemptInfo,
+    ClassificationOutcome,
+    FALLBACK_CLASSIFICATION,
+)
 
 @pytest.mark.integration
 def test_receive_pqrs_success(client, seed_areas, sample_ticket_payload, mock_openai_classification, db_session):
@@ -48,9 +56,9 @@ def test_reuse_claimant(client, seed_areas, sample_ticket_payload, mock_openai_c
 
 @pytest.mark.integration
 def test_ticket_creation_is_atomic(client, sample_ticket_payload, seed_areas, mocker, db_session):
-    from app.services.classifier import ClassificationOutcome, FALLBACK_CLASSIFICATION
     mocker.patch("app.services.ticket_service.classify_ticket_text", return_value=ClassificationOutcome(
         classification=FALLBACK_CLASSIFICATION,
+        source="fallback",
         raw_response=None,
         tokens_used=None,
         latency_ms=None,
@@ -67,7 +75,7 @@ def test_ticket_creation_is_atomic(client, sample_ticket_payload, seed_areas, mo
 
 @pytest.mark.integration
 def test_ai_fallback_never_breaks_flow(client, sample_ticket_payload, seed_areas, mocker):
-    mocker.patch("app.services.classifier._call_openai", side_effect=Exception("OpenAI down"))
+    mocker.patch("app.services.classifier._call_openai_with_retry", side_effect=Exception("OpenAI down"))
     
     response = client.post("/api/v1/pqrs/", json=sample_ticket_payload)
     assert response.status_code == 201
@@ -80,3 +88,49 @@ def test_ticket_response_accepts_uuid(client, sample_ticket_payload, mock_openai
     assert response.status_code == 201
     assert "tracking_number" in response.json()
 
+
+@pytest.mark.integration
+def test_heuristic_used_when_openai_fails(
+    client, sample_ticket_payload, seed_areas, mocker, db_session
+):
+    classification = TicketClassification(
+        ticket_type=TicketType.PETITION,
+        priority=TicketPriority.MEDIUM,
+        responsible_area=AreaCode.FACTURACION,
+        decision_justification="Clasificación heurística para facturación.",
+    )
+    outcome = ClassificationOutcome(classification=classification, source="heuristic")
+    mocker.patch("app.services.ticket_service.classify_ticket_text", return_value=outcome)
+
+    response = client.post("/api/v1/pqrs/", json=sample_ticket_payload)
+
+    assert response.status_code == 201
+    ticket = db_session.query(Ticket).filter_by(
+        tracking_number=response.json()["tracking_number"]
+    ).one()
+    audit = db_session.query(AIAudit).filter_by(ticket_id=ticket.id).one()
+    assert audit.classification_source == "heuristic"
+
+
+@pytest.mark.integration
+def test_audit_attempts_persisted(
+    client, sample_ticket_payload, seed_areas, mocker, db_session
+):
+    outcome = ClassificationOutcome(
+        classification=FALLBACK_CLASSIFICATION,
+        source="fallback",
+        attempts=[
+            AttemptInfo(1, "APIConnectionError", "first failure", 10),
+            AttemptInfo(2, "APIConnectionError", "second failure", 20),
+        ],
+    )
+    mocker.patch("app.services.ticket_service.classify_ticket_text", return_value=outcome)
+
+    response = client.post("/api/v1/pqrs/", json=sample_ticket_payload)
+
+    assert response.status_code == 201
+    ticket = db_session.query(Ticket).filter_by(
+        tracking_number=response.json()["tracking_number"]
+    ).one()
+    attempts = db_session.query(AIAuditAttempt).filter_by(ticket_id=ticket.id).all()
+    assert len(attempts) == 2

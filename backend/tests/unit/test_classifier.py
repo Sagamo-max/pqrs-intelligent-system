@@ -35,8 +35,8 @@ def test_classify_happy_path(mocker):
 @pytest.mark.unit
 def test_classify_fallback_on_api_error(mocker):
     mock_client = mocker.patch("app.services.classifier.client")
-    mock_client.beta.chat.completions.parse.side_effect = openai.APIError(
-        message="API down", request=MagicMock(), body=None
+    mock_client.beta.chat.completions.parse.side_effect = openai.APIConnectionError(
+        request=MagicMock()
     )
 
     mocker.patch("time.sleep")

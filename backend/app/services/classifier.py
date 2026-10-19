@@ -39,6 +39,7 @@ RETRYABLE_EXCEPTIONS = (
     APITimeoutError,
     RateLimitError,
     InternalServerError,
+    RuntimeError,
 )
 
 NON_RETRYABLE_EXCEPTIONS = (
