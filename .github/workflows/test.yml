@@ -65,6 +65,10 @@ jobs:
               exit(1)
           "
 
+      - name: Create test-only database
+        run: |
+          PGPASSWORD=test psql -h localhost -U test -d pqrs_test -c "CREATE DATABASE pqrs_test_alt;"
+
       - name: Download spaCy model
         working-directory: ./backend
         run: python -m spacy download es_core_news_sm
