@@ -27,7 +27,7 @@ jobs:
 
     env:
       DATABASE_URL: postgresql+psycopg://test:test@localhost:5432/pqrs_test
-      TEST_DATABASE_URL: postgresql+psycopg://test:test@localhost:5432/pqrs_test
+      TEST_DATABASE_URL: postgresql+psycopg://test:test@localhost:5432/pqrs_test_alt
       OPENAI_API_KEY: sk-test-fake-key-for-ci
       AI_PROVIDER: openai
       AI_MODEL_NAME: gpt-6-luna
@@ -64,6 +64,10 @@ jobs:
               print('Timed out')
               exit(1)
           "
+
+      - name: Create test-only database
+        run: |
+          PGPASSWORD=test psql -h localhost -U test -d pqrs_test -c "CREATE DATABASE pqrs_test_alt;"
 
       - name: Download spaCy model
         working-directory: ./backend
