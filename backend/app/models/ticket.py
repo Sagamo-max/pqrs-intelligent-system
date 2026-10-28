@@ -1,9 +1,11 @@
-import uuid
 import enum
-from sqlalchemy import Column, String, Text, Date, DateTime, ForeignKey, Enum as SQLEnum
+import uuid
+
+from sqlalchemy import Boolean, Column, Date, DateTime, Enum as SQLEnum, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+
 from app.core.database import Base
 
 
@@ -12,6 +14,8 @@ class TicketType(str, enum.Enum):
     COMPLAINT = "COMPLAINT"
     CLAIM = "CLAIM"
     SUGGESTION = "SUGGESTION"
+    INFORMATION_REQUEST = "INFORMATION_REQUEST"  
+    CONSULTATION = "CONSULTATION" 
 
 
 class TicketPriority(str, enum.Enum):
@@ -42,7 +46,8 @@ class Ticket(Base):
     status = Column(SQLEnum(TicketStatus, name="ticket_status_enum"), nullable=False, default=TicketStatus.RECEIVED)
 
     filing_date = Column(Date, server_default=func.current_date(), nullable=False)
-    due_date = Column(Date, nullable=False, index=True)
+    due_date = Column(Date, nullable=True, index=True)
+    needs_sla_validation = Column(Boolean, default=False, nullable=False, index=True)  # nuevo
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
@@ -51,3 +56,4 @@ class Ticket(Base):
     area = relationship("Area", back_populates="tickets")
     ai_audit = relationship("AIAudit", back_populates="ticket", uselist=False, cascade="all, delete-orphan")
     change_audits = relationship("ChangeAudit", back_populates="ticket", cascade="all, delete-orphan")
+    ai_audit_attempts = relationship("AIAuditAttempt", back_populates="ticket", cascade="all, delete-orphan")

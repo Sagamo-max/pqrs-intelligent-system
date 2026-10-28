@@ -27,4 +27,4 @@ class AIAuditAttempt(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
-    ticket = relationship("Ticket", backref="ai_audit_attempts")
+    ticket = relationship("Ticket", back_populates="ai_audit_attempts")
