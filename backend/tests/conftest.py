@@ -169,17 +169,18 @@ def sample_ticket_payload():
 @pytest.fixture
 def mock_openai_classification(mocker):
     def _mock(classification_kwargs=None):
-        if classification_kwargs is None:
-            classification_kwargs = {
-                "ticket_type": TicketType.PETITION,
-                "priority": TicketPriority.MEDIUM,
-                "responsible_area": AreaCode.ATENCION_USUARIO,
-                "decision_justification": (
-                    "Mocked justification that is longer than 10 characters."
-                ),
-            }
+        default_classification = {
+            "ticket_type": TicketType.PETITION,
+            "priority": TicketPriority.MEDIUM,
+            "responsible_area": AreaCode.ATENCION_USUARIO,
+            "decision_justification": (
+                "Mocked justification that is longer than 10 characters."
+            ),
+        }
+        if classification_kwargs is not None:
+            default_classification.update(classification_kwargs)
         mock_outcome = ClassificationOutcome(
-            classification=TicketClassification(**classification_kwargs),
+            classification=TicketClassification(**default_classification),
             source="openai",
             raw_response={"mock": "data"},
             tokens_used=100,
