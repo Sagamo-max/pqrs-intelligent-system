@@ -112,6 +112,9 @@ El servicio `api` ejecuta `alembic upgrade head` automáticamente al arrancar me
 | `AI_PROVIDER` | No | `openai` | Proveedor de clasificación |
 | `AI_MODEL_NAME` | Sí | — | Modelo usado para clasificar |
 | `AI_BASE_URL` | No | — | URL base opcional para un proveedor compatible |
+| `JWT_SECRET_KEY` | Sí | — | Secreto usado para firmar tokens JWT |
+| `JWT_ALGORITHM` | No | `HS256` | Algoritmo de firma JWT |
+| `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | No | `60` | Duración de los tokens de acceso |
 | `PROJECT_NAME` | No | `Ticket Intelligent Triage API` | Nombre del proyecto |
 | `API_V1_STR` | No | `/api/v1` | Prefijo de la API |
 
@@ -123,6 +126,7 @@ Nunca hardcodees valores reales ni subas `.env` al repositorio.
 - El `Dockerfile` ejecuta `apt-get upgrade` en el stage runtime para aplicar parches de Debian.
 - El servicio `api` corre como usuario no-root (`appuser`).
 - `.env` está incluido en `.gitignore` y nunca debe subirse al repositorio.
+- El primer usuario `MASTER` se crea con `python scripts/create_master.py`.
 - `tests/conftest.py` rechaza la ejecución si `TEST_DATABASE_URL` es igual a `DATABASE_URL`.
 
 ## Tests

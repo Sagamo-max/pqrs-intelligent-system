@@ -1,15 +1,23 @@
 import logging
 from typing import Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.auth_deps import get_current_user
+from app.models.funcionario import FuncionarioRole
 from app.models.ticket import Ticket
 from app.schemas.classification import TicketClassification
-from app.schemas.ticket import TicketCreate, TicketResponse, TicketTypeChangeRequest
+from app.schemas.ticket import (
+    TicketCreate,
+    TicketListResponse,
+    TicketResponse,
+    TicketTypeChangeRequest,
+)
 from app.services.change_audit_service import create_change_audit
 from app.services.claimant_service import get_or_create_claimant
 from app.services.classifier import classify_ticket_text
@@ -17,7 +25,11 @@ from app.services.sla import calculate_due_date
 from app.services.ticket_service import create_ticket
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/pqrs", tags=["Tickets"])
+router = APIRouter(
+    prefix="/pqrs",
+    tags=["Tickets"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 class TicketClassificationRequest(BaseModel):
@@ -52,21 +64,68 @@ def submit_ticket(request: TicketCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.get("/", response_model=list[TicketResponse])
+@router.get("/", response_model=TicketListResponse | list[TicketResponse])
 def list_tickets(
+    ticket_type: str | None = None,
+    status: str | None = None,
+    area_id: UUID | None = None,
+    priority: str | None = None,
+    limit: int = 20,
+    offset: int = 0,
     needs_sla_validation: Optional[bool] = None,
     db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
 ):
-    """
-    Lista los tickets ordenados por fecha de creación (más recientes primero).
+    if limit < 1 or limit > 100:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="limit must be between 1 and 100",
+        )
+    if offset < 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="offset must be non-negative",
+        )
 
-    Si `needs_sla_validation=true`, filtra los tickets que requieren validación
-    humana del SLA (por ejemplo, los clasificados como CONSULTATION).
-    """
-    stmt = select(Ticket).order_by(Ticket.created_at.desc())
+    filters = []
+    if current_user.role == FuncionarioRole.ANALISTA:
+        filters.append(Ticket.area_id == current_user.area_id)
+    if ticket_type is not None:
+        filters.append(Ticket.ticket_type == ticket_type)
+    if status is not None:
+        filters.append(Ticket.status == status)
+    if area_id is not None:
+        filters.append(Ticket.area_id == area_id)
+    if priority is not None:
+        filters.append(Ticket.priority == priority)
     if needs_sla_validation is not None:
-        stmt = stmt.where(Ticket.needs_sla_validation.is_(needs_sla_validation))
-    return list(db.scalars(stmt))
+        filters.append(Ticket.needs_sla_validation.is_(needs_sla_validation))
+
+    if needs_sla_validation is not None:
+        return list(
+            db.scalars(
+                select(Ticket)
+                .where(*filters)
+                .order_by(Ticket.created_at.desc())
+            )
+        )
+
+    total = db.scalar(
+        select(func.count()).select_from(Ticket).where(*filters)
+    ) or 0
+    tickets = db.scalars(
+        select(Ticket)
+        .where(*filters)
+        .order_by(Ticket.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+    ).all()
+    return TicketListResponse(
+        items=tickets,
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.patch(
@@ -78,6 +137,7 @@ def change_ticket_type(
     tracking_number: str,
     payload: TicketTypeChangeRequest,
     db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
 ):
     """
     Reclasifica un ticket y recalcula su SLA con la regla determinista
@@ -88,9 +148,10 @@ def change_ticket_type(
     - Registra el cambio en `ChangeAudit` con quién lo hizo, valores
         anterior/nuevo y motivo.
     """
-    ticket = db.scalar(
-        select(Ticket).where(Ticket.tracking_number == tracking_number)
-    )
+    stmt = select(Ticket).where(Ticket.tracking_number == tracking_number)
+    if current_user.role == FuncionarioRole.ANALISTA:
+        stmt = stmt.where(Ticket.area_id == current_user.area_id)
+    ticket = db.scalar(stmt)
     if not ticket:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Ticket not found")
 
