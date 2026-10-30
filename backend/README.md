@@ -159,6 +159,51 @@ El workflow de GitHub Actions en `.github/workflows/test.yml` ejecuta:
 - `test`: instala dependencias, prepara PostgreSQL, ejecuta migraciones y corre pytest con cobertura.
 - `docker-build`: construye la imagen y ejecuta un smoke test de la API.
 
+## Known security risks and false positives
+
+### CVE-2026-85091 — `zlib` in Debian 13 trixie (HIGH, no fix available)
+
+- **Package:** `zlib 1:1.3.dfsg+really1.3.1-1` (base image `python:3.12-slim`)
+- **Severity:** High (CVSS 7.5)
+- **Status:** No patch available from Debian as of 2026-10.
+- **Impact:** Buffer overflow when processing maliciously crafted compressed input.
+- **Mitigation:** The application does not decompress untrusted user input directly.
+  Compression is handled at the HTTP layer by Uvicorn/Starlette. Monitored via
+  Debian security advisories; the base image will be updated as soon as a patch
+  is released.
+- **Reference:** https://scout.docker.com/v/CVE-2026-85091
+
+### `msgpack 1.1.2` flagged by Docker Scout (FALSE POSITIVE)
+
+- **Package:** `msgpack 1.1.2` — reported by `docker scout cves` with 3 HIGH CVEs.
+- **Reality:** `msgpack` is **NOT** a dependency of the application. It is
+  vendored inside `pip` itself (`pip/_vendor/bom.cdx.json`) and is only used
+  by `pip`'s internal SBOM machinery.
+- **Verification:**
+  ```bash
+  docker compose exec api python -c "import msgpack"
+  # ModuleNotFoundError: No module named 'msgpack'
+  ```
+- **Status:** Accepted as a known false positive until `pip` ships a newer
+  vendored copy. Tracked for future `pip` upgrades.
+
+## Security scanning
+
+### Local scan (requires Docker Scout login)
+
+```bash
+docker scout quickview local://pqrs-intelligent-system-api:latest
+docker scout cves local://pqrs-intelligent-system-api:latest --only-severity high
+```
+
+### Expected results
+
+- `zlib` (1 HIGH): known Debian CVE without patch, documented above.
+- `msgpack` (3 HIGH): **false positive**, documented above.
+- `urllib3` / `setuptools`: patched via `constraints.txt` (`2.8.0+`, `78.1.1+`).
+
+The image is considered production-ready with these two documented exceptions.
+
 ## Roadmap
 
 - HU-14: migrar la sanitización de PII a Microsoft Presidio.

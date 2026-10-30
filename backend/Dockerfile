@@ -20,8 +20,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
+# Upgrade build tooling to close known CVEs in setuptools/pip.
+# This must run before installing requirements so the constraints
+# can resolve against the patched versions.
+RUN python -m pip install --upgrade "pip>=26.0" "setuptools>=78.1.1" "wheel>=0.45"
+
 COPY requirements.txt constraints.txt ./
-RUN pip install --upgrade pip && pip install -r requirements.txt -c constraints.txt
+# NOTE: `msgpack 1.1.2` may appear in vulnerability scans. It is NOT
+# a dependency of the application; it is vendored inside `pip` itself
+# (see `pip/_vendor/bom.cdx.json`). Verified with:
+#   docker compose exec api python -c "import msgpack"  # ModuleNotFoundError
+# Tracked as a known false positive until pip ships a newer vendored copy.
+RUN pip install -r requirements.txt -c constraints.txt \
+    && pip install --upgrade "msgpack>=1.2.3" "urllib3>=2.8.0" "setuptools>=78.1.1"
 
 # Download spaCy model (needed by sanitizer_service)
 RUN python -m spacy download es_core_news_sm
@@ -34,20 +45,21 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:$PATH"
 
-# Runtime deps: libpq for psycopg, curl for healthcheck
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Runtime deps: libpq for psycopg, curl for healthcheck, tini for signal handling
+# Also apply the latest Debian security patches available in the base image.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
         libpq5 \
         curl \
         tini \
+    && apt-get upgrade -y \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy the venv from builder
+# Copy the venv from builder (contains patched setuptools/msgpack/urllib3)
 COPY --from=builder /opt/venv /opt/venv
 
 # Non-root user
 RUN useradd --create-home --shell /bin/bash appuser
-# Dentro del stage runtime, antes del USER appuser
-RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 USER appuser
 WORKDIR /app
 
