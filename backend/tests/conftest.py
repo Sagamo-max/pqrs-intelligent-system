@@ -9,9 +9,11 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
+from app.core.auth_deps import get_current_user
 from app.core.database import Base, get_db
 from app.main import app
 from app.models.area import Area
+from app.models.funcionario import Funcionario, FuncionarioRole
 from app.models.ticket import TicketPriority, TicketType
 from app.schemas.classification import AreaCode, TicketClassification
 from app.services.classifier import ClassificationOutcome
@@ -112,10 +114,18 @@ def client(db_session):
     def override_get_db():
         yield db_session
 
+    test_user = Funcionario(role=FuncionarioRole.MASTER, is_active=True)
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_current_user] = lambda: test_user
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def auth_client(client):
+    app.dependency_overrides.pop(get_current_user, None)
+    return client
 
 
 # ---------------------------------------------------------------------------

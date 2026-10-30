@@ -1,5 +1,5 @@
 import re
-from datetime import date
+from datetime import date, datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -78,3 +78,23 @@ class TicketTypeChangeRequest(BaseModel):
     ticket_type: TicketType
     responsible_user: str = Field(..., min_length=3, max_length=100)
     change_reason: str | None = Field(None, max_length=500)
+
+
+class TicketListOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    tracking_number: str
+    ticket_type: str
+    priority: str
+    status: str
+    due_date: date | None
+    area: AreaOut | None
+    created_at: datetime
+
+
+class TicketListResponse(BaseModel):
+    items: list[TicketListOut]
+    total: int
+    limit: int
+    offset: int
