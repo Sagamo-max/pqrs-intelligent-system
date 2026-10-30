@@ -35,7 +35,7 @@ RUN pip install -r requirements.txt -c constraints.txt \
     && pip install --upgrade "msgpack>=1.2.3" "urllib3>=2.8.0" "setuptools>=78.1.1"
 
 # Download spaCy model (needed by sanitizer_service)
-RUN python -m spacy download es_core_news_sm
+RUN python -m spacy download es_core_news_md
 
 
 # ---------- Stage 2: runtime ----------
