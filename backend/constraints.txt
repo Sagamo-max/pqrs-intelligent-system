@@ -1,0 +1,13 @@
+# Security pins for transitive dependencies with known CVEs.
+# These are NOT direct dependencies of the application; they are
+# pinned to versions that patch known vulnerabilities.
+#
+# Update these when:
+#   - A new CVE is reported for any of these packages
+#   - A dependency of the app requires a specific version
+#
+# Check with: pip-audit -r requirements.txt -c constraints.txt
+
+msgpack>=1.2.3
+urllib3>=2.8.0
+setuptools>=78.1.1

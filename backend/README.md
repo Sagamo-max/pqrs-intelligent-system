@@ -1,205 +1,211 @@
-# Backend de triaje de PQRS
+# Backend de PQRS Intelligent Triage
 
-API REST construida con FastAPI para registrar PQRS, sanitizar datos personales y solicitar una clasificación estructurada a un modelo compatible con el SDK de OpenAI.
+Backend para el triaje inteligente de Peticiones, Quejas, Reclamos y Sugerencias (PQRS). Expone una API FastAPI, persiste la información en PostgreSQL y usa OpenAI para proponer la clasificación de cada solicitud.
 
-## Componentes
+## Estructura
+
+### Stack técnico
+
+- Python 3.12+
+- FastAPI y Uvicorn
+- PostgreSQL 16
+- SQLAlchemy 2.0 y Alembic
+- Pydantic v2
+- OpenAI
+- pytest y pytest-cov
+
+### Carpetas y archivos principales
 
 ```text
 backend/
-├── app/
-│   ├── core/
-│   │   ├── config.py       # Settings desde .env
-│   │   └── database.py     # Engine, Base y sesiones SQLAlchemy
-│   ├── models/             # Claimant, Department, Ticket y auditorías
-│   ├── routers/
-│   │   ├── health.py       # Endpoint de salud
-│   │   └── ticket.py       # Clasificación y recepción de PQRS
-│   ├── schemas/             # DTOs y validaciones Pydantic
-│   └── services/
-│       ├── audit_service.py
-│       ├── claimant_service.py
-│       ├── classifier.py
-│       ├── sanitizer_service.py
-│       ├── sla.py
-│       └── ticket_service.py
-├── alembic/                 # Historial de esquema
-├── alembic.ini
-├── requirements.txt
-└── README.md
+├── app/             # API, modelos, esquemas y servicios
+├── alembic/         # Migraciones de base de datos
+├── tests/           # Pruebas unitarias y de integración
+├── Dockerfile       # Imagen del backend
+└── constraints.txt  # Versiones fijadas por seguridad
 ```
 
-## Configuración
+## Local Setup
 
-`app.core.config.Settings` carga `.env` desde el directorio de ejecución. Copiar `.env.example` a `.env` y reemplazar los valores de ejemplo. Son obligatorias:
+### Requisitos
 
-```dotenv
-AI_API_KEY=tu_api_key
-AI_MODEL_NAME=tu_modelo
-```
+- Python 3.12 o superior
+- PostgreSQL 16, o Docker
+- Docker Desktop
 
-La conexión de PostgreSQL puede configurarse de dos maneras. Se recomienda una URL completa:
-
-```dotenv
-DATABASE_URL=postgresql://usuario:password@host:5432/base_de_datos
-```
-
-Si `DATABASE_URL` se omite, se construye con estas variables:
-
-```dotenv
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=tu_password
-POSTGRES_HOST=localhost
-POSTGRES_PORT=5432
-POSTGRES_DB=ticket_db
-```
-
-También se pueden definir:
-
-```dotenv
-PROJECT_NAME=Ticket Intelligent Triage API
-API_V1_STR=/api/v1
-AI_PROVIDER=openai
-AI_BASE_URL=https://api.example.com/v1
-```
-
-`AI_BASE_URL` es opcional y permite usar un gateway o proveedor compatible con la API de OpenAI.
-
-## Instalación y ejecución
+Desde `backend/`, crea y activa un entorno virtual:
 
 ```powershell
-cd backend
 python -m venv venv
 .\venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-python -m spacy download es_core_news_sm
+```
+
+En Linux o Mac:
+
+```bash
+source venv/bin/activate
+```
+
+Instala las dependencias:
+
+```bash
+pip install -r requirements-dev.txt
+```
+
+Configura `.env` copiando `backend/.env.example` y reemplazando los valores de ejemplo. Después aplica las migraciones y ejecuta la API:
+
+```bash
 alembic upgrade head
 uvicorn app.main:app --reload
 ```
 
-La aplicación queda en `http://127.0.0.1:8000`. La especificación OpenAPI está en `/docs` y `/redoc`.
+La API queda disponible en `http://localhost:8000`.
 
-## API disponible
+Ejecuta las pruebas con:
 
-### Salud
-
-`GET /`
-
-Respuesta aproximada:
-
-```json
-{
-  "status": "online",
-  "service": "Ticket Triage Backend",
-  "version": "0.1.0"
-}
+```bash
+pytest -v
 ```
 
-### Clasificación de prueba
+## Docker
 
-`POST /api/v1/pqrs/classify-poc`
+### Requisitos
 
-Entrada:
+- Docker Desktop 4.x o superior
+- Docker Compose 2.x o superior
 
-```json
-{
-  "text": "Texto de la solicitud que contiene al menos 15 caracteres."
-}
+Desde la raíz del repositorio, inicia todos los servicios:
+
+```bash
+docker compose up -d
 ```
 
-Devuelve una clasificación estructurada con:
+Verifica que `api` y `db` estén `healthy`:
 
-- `ticket_type`: `PETITION`, `COMPLAINT`, `CLAIM` o `SUGGESTION`.
-- `priority`: `HIGH`, `MEDIUM` o `LOW`.
-- `responsible_area`: área responsable, con máximo 20 caracteres.
-- `decision_justification`: explicación de la decisión.
-
-Este endpoint envía el texto directamente al clasificador y sirve como prueba de concepto.
-
-### Recepción de PQRS
-
-`POST /api/v1/pqrs/`
-
-Entrada:
-
-```json
-{
-  "claimant": {
-    "full_name": "Nombre completo",
-    "document_type": "CC",
-    "document_number": "1234567890",
-    "email": "persona@example.com",
-    "phone": "3001234567"
-  },
-  "free_text": "Descripción de la petición con al menos 15 caracteres."
-}
+```bash
+docker compose ps
 ```
 
-Flujo actual:
+- API: `http://localhost:8000`
+- PostgreSQL: `localhost:5432`
 
-1. Busca o crea el ciudadano por número de documento.
-2. Crea el ticket con número `PQRS-XXXXXXXX`.
-3. Sanitiza correo, teléfono, documento y entidades de persona.
-4. Envía el texto sanitizado al modelo.
-5. Guarda la clasificación y los textos en `ai_audits`.
-6. Devuelve el número de seguimiento y el estado.
+Comandos útiles:
 
-Respuesta:
-
-```json
-{
-  "ticket_number": "PQRS-1A2B3C4D",
-  "status": "RECEIVED"
-}
+```bash
+docker compose logs -f api
+docker compose up -d --build api
+docker compose exec api alembic upgrade head
+docker compose exec db psql -U postgres -d ticket_db
+docker compose down
+docker compose down -v
 ```
 
-## Persistencia
+El servicio `api` ejecuta `alembic upgrade head` automáticamente al arrancar mediante `command:` en `docker-compose.yml`.
 
-Las migraciones crean las tablas:
+## Variables de entorno
 
-- `claimants`: datos del solicitante.
-- `departments`: áreas responsables.
-- `tickets`: solicitud, estado, prioridad, fechas y relaciones.
-- `ai_audits`: modelo, proveedor, texto original, texto sanitizado y clasificación sugerida.
-- `change_audits`: estructura preparada para registrar cambios manuales.
+| Variable | Requerida | Valor por defecto | Descripción |
+|---|---:|---|---|
+| `DATABASE_URL` | Sí | — | URL de conexión a PostgreSQL |
+| `TEST_DATABASE_URL` | Sí para tests | — | URL de una base de datos PostgreSQL aislada para pruebas |
+| `OPENAI_API_KEY` | Sí | — | Clave del proveedor de IA |
+| `AI_PROVIDER` | No | `openai` | Proveedor de clasificación |
+| `AI_MODEL_NAME` | Sí | — | Modelo usado para clasificar |
+| `AI_BASE_URL` | No | — | URL base opcional para un proveedor compatible |
+| `PROJECT_NAME` | No | `Ticket Intelligent Triage API` | Nombre del proyecto |
+| `API_V1_STR` | No | `/api/v1` | Prefijo de la API |
 
-Comandos habituales:
+Nunca hardcodees valores reales ni subas `.env` al repositorio.
 
-```powershell
+## Seguridad
+
+- `constraints.txt` fija versiones de dependencias transitivas con CVEs conocidos (`msgpack`, `urllib3` y `setuptools`).
+- El `Dockerfile` ejecuta `apt-get upgrade` en el stage runtime para aplicar parches de Debian.
+- El servicio `api` corre como usuario no-root (`appuser`).
+- `.env` está incluido en `.gitignore` y nunca debe subirse al repositorio.
+- `tests/conftest.py` rechaza la ejecución si `TEST_DATABASE_URL` es igual a `DATABASE_URL`.
+
+## Tests
+
+Las pruebas requieren PostgreSQL; no usan SQLite porque los modelos utilizan `JSONB` y `UUID`.
+
+`TEST_DATABASE_URL` es obligatoria y debe apuntar a una base de datos aislada:
+
+```bash
+pytest -v
+```
+
+Para obtener cobertura:
+
+```bash
+pytest --cov=app --cov-report=term-missing
+```
+
+## Migrations
+
+```bash
+alembic upgrade head
+alembic revision -m "..."
 alembic current
 alembic history
-alembic upgrade head
-alembic downgrade -1
 ```
 
-## Estados y reglas actuales
+Nunca dejes `<auto>` en un archivo de migración.
 
-Estados de ticket: `RECEIVED`, `IN_PROGRESS`, `RESOLVED`, `CLOSED`.
+## CI/CD
 
-Tipos: `PETITION`, `COMPLAINT`, `CLAIM`, `SUGGESTION`.
+El workflow de GitHub Actions en `.github/workflows/test.yml` ejecuta:
 
-Prioridades: `HIGH`, `MEDIUM`, `LOW`.
+- `test`: instala dependencias, prepara PostgreSQL, ejecuta migraciones y corre pytest con cobertura.
+- `docker-build`: construye la imagen y ejecuta un smoke test de la API.
 
-El servicio SLA actual devuelve la fecha de hoy más 15 días calendario, independientemente del tipo recibido. La clasificación de IA se guarda como sugerencia en auditoría; no actualiza todavía los campos principales del ticket.
+## Known security risks and false positives
 
-## Limitaciones conocidas
+### CVE-2026-85091 — `zlib` in Debian 13 trixie (HIGH, no fix available)
 
-- No hay pruebas automatizadas en el repositorio.
-- No hay autenticación ni autorización.
-- No existe endpoint de consulta, actualización o cierre de tickets.
-- La configuración de PostgreSQL no admite todavía una URL completa configurable.
-- El clasificador está acoplado al cliente de OpenAI aunque existe `AI_PROVIDER` en configuración.
-- Las excepciones se devuelven en el detalle HTTP y el flujo de creación realiza varios commits antes de completar todo el proceso.
-- `spacy.load("es_core_news_sm")` exige que el modelo de idioma esté instalado antes de importar el sanitizador.
+- **Package:** `zlib 1:1.3.dfsg+really1.3.1-1` (base image `python:3.12-slim`)
+- **Severity:** High (CVSS 7.5)
+- **Status:** No patch available from Debian as of 2026-10.
+- **Impact:** Buffer overflow when processing maliciously crafted compressed input.
+- **Mitigation:** The application does not decompress untrusted user input directly.
+  Compression is handled at the HTTP layer by Uvicorn/Starlette. Monitored via
+  Debian security advisories; the base image will be updated as soon as a patch
+  is released.
+- **Reference:** https://scout.docker.com/v/CVE-2026-85091
 
-## Pruebas Automatizadas (Testing)
+### `msgpack 1.1.2` flagged by Docker Scout (FALSE POSITIVE)
 
-El sistema cuenta con una suite completa de pruebas unitarias y de integración desarrolladas con `pytest`, las cuales aíslan las llamadas a OpenAI y utilizan transacciones de rollback para no alterar la base de datos de pruebas.
+- **Package:** `msgpack 1.1.2` — reported by `docker scout cves` with 3 HIGH CVEs.
+- **Reality:** `msgpack` is **NOT** a dependency of the application. It is
+  vendored inside `pip` itself (`pip/_vendor/bom.cdx.json`) and is only used
+  by `pip`'s internal SBOM machinery.
+- **Verification:**
+  ```bash
+  docker compose exec api python -c "import msgpack"
+  # ModuleNotFoundError: No module named 'msgpack'
+  ```
+- **Status:** Accepted as a known false positive until `pip` ships a newer
+  vendored copy. Tracked for future `pip` upgrades.
 
-Para ejecutar la suite localmente:
-```powershell
-pip install pytest pytest-cov pytest-mock httpx
-# Es requisito configurar una base de datos de PostgreSQL aislada para los tests:
-$env:TEST_DATABASE_URL="postgresql://usuario:password@localhost:5432/ticket_db_test"
-pytest
+## Security scanning
+
+### Local scan (requires Docker Scout login)
+
+```bash
+docker scout quickview local://pqrs-intelligent-system-api:latest
+docker scout cves local://pqrs-intelligent-system-api:latest --only-severity high
 ```
-Consulta el archivo [backend/tests/README.md](tests/README.md) para más detalles.
+
+### Expected results
+
+- `zlib` (1 HIGH): known Debian CVE without patch, documented above.
+- `msgpack` (3 HIGH): **false positive**, documented above.
+- `urllib3` / `setuptools`: patched via `constraints.txt` (`2.8.0+`, `78.1.1+`).
+
+The image is considered production-ready with these two documented exceptions.
+
+## Roadmap
+
+- HU-14: migrar la sanitización de PII a Microsoft Presidio.
+- Añadir autenticación en endpoints admin.
+- Fusionar con el módulo del compañero mediante un monolito modular por eventos.

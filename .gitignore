@@ -8,7 +8,11 @@ __pycache__/
 
 # Secretos y variables de entorno
 .env
+.env.local
+.env.docker
 backend/.env
+backend/.env.docker
+volumes/
 
 # Node / Frontend (para cuando configuremos la interfaz)
 node_modules/
