@@ -45,3 +45,25 @@ def test_sanitize_returns_string_not_tuple():
     assert "[MASKED_NAME]" in result
     assert "[MASKED_DOCUMENT]" in result
 
+@pytest.mark.unit
+def test_sanitize_name_with_accents():
+    assert "[MASKED_NAME]" in sanitize_text("María José presentó la solicitud.")
+
+@pytest.mark.unit
+def test_sanitize_document_with_dots():
+    assert sanitize_text("cédula 1.234.567") == "cédula [MASKED_DOCUMENT]"
+
+@pytest.mark.unit
+def test_sanitize_document_without_dots():
+    assert sanitize_text("CC 1234567") == "CC [MASKED_DOCUMENT]"
+
+@pytest.mark.unit
+def test_sanitize_email_and_name_together():
+    result = sanitize_text("María José, correo maria@example.com.")
+    assert "[MASKED_NAME]" in result
+    assert "[MASKED_EMAIL]" in result
+
+@pytest.mark.unit
+def test_sanitize_text_without_pii_is_unchanged():
+    text = "El trámite fue recibido y será revisado por el área correspondiente."
+    assert sanitize_text(text) == text
