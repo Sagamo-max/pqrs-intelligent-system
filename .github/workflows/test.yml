@@ -73,8 +73,10 @@ jobs:
         working-directory: ./backend
         run: python -m spacy download es_core_news_sm
 
-      - name: Apply migrations
+      - name: Apply migrations to test database
         working-directory: ./backend
+        env:
+          DATABASE_URL: postgresql+psycopg://test:test@localhost:5432/pqrs_test_alt
         run: |
           alembic upgrade head
           alembic current
@@ -89,3 +91,43 @@ jobs:
         with:
           file: ./backend/coverage.xml
           fail_ci_if_error: false
+
+  docker-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build API image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: false
+          load: true
+          tags: pqrs-api:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test the image
+        run: |
+          docker run -d --name smoke-api \
+            -e OPENAI_API_KEY=sk-fake \
+            -e DATABASE_URL=postgresql+psycopg://user:pass@host:5432/db \
+            -p 8001:8000 \
+            pqrs-api:ci
+          echo "Waiting for container to become ready..."
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8001/ > /dev/null 2>&1; then
+              echo "API is responding."
+              break
+            fi
+            sleep 1
+          done
+          curl -fsS http://localhost:8001/ || (docker logs smoke-api && exit 1)
+          curl -fsS http://localhost:8001/health || (docker logs smoke-api && exit 1)
+          docker stop smoke-api
+          docker rm smoke-api

@@ -1,0 +1,45 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: pqrs_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: ticket_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pqrs_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ticket_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: pqrs_api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PROJECT_NAME: Ticket Intelligent Triage API
+      API_V1_STR: /api/v1
+      DATABASE_URL: postgresql+psycopg://postgres:admin@db:5432/ticket_db
+      TEST_DATABASE_URL: postgresql+psycopg://postgres:admin@db:5432/ticket_db_test
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      AI_PROVIDER: openai
+      AI_MODEL_NAME: gpt-6-luna
+    ports:
+      - "8000:8000"
+    command: >
+      sh -c "alembic upgrade head &&
+            uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2"
+
+volumes:
+  pqrs_db_data:
+    driver: local
