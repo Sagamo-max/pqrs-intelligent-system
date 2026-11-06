@@ -28,6 +28,7 @@ class ClaimantCreate(BaseModel):
 class TicketCreate(BaseModel):
     claimant: ClaimantCreate
     free_text: str
+    organization_id: UUID
 
     @field_validator("free_text")
     @classmethod

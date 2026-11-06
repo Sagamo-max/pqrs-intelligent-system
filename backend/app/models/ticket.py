@@ -37,6 +37,7 @@ class Ticket(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     claimant_id = Column(UUID(as_uuid=True), ForeignKey("claimants.id", ondelete="RESTRICT"), nullable=False, index=True)
     area_id = Column(UUID(as_uuid=True), ForeignKey("areas.id", ondelete="RESTRICT"), nullable=True, index=True)
+    organization_id = Column(UUID(as_uuid=True), nullable=True, index=True)
 
     tracking_number = Column(String(30), unique=True, nullable=False, index=True)
     original_text = Column(Text, nullable=False)

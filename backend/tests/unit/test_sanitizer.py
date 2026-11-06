@@ -1,5 +1,19 @@
 import pytest
-from app.services.sanitizer_service import sanitize_text, mask_regex_patterns, mask_ner_patterns
+from app.services.sanitizer_service import (
+    _OPERATORS,
+    mask_ner_patterns,
+    mask_regex_patterns,
+    sanitize_text,
+)
+
+
+@pytest.mark.unit
+def test_all_configured_masks_use_square_brackets():
+    for operator in _OPERATORS.values():
+        replacement = operator.params["new_value"]
+        assert replacement.startswith("[MASKED_")
+        assert replacement.endswith("]")
+        assert "<MASKED_" not in replacement
 
 @pytest.mark.unit
 def test_mask_emails():

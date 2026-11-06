@@ -54,6 +54,7 @@ def submit_ticket(request: TicketCreate, db: Session = Depends(get_db)):
             db=db,
             free_text=request.free_text,
             claimant_id=claimant.id,
+            organization_id=request.organization_id,
         )
 
         return TicketResponse.model_validate(ticket)

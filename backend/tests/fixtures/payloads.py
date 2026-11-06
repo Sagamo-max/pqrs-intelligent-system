@@ -8,6 +8,6 @@ sample_claimant_payload = {
 
 sample_ticket_payload = {
     "claimant": sample_claimant_payload,
-    "free_text": "Este es un texto de prueba suficientemente largo para ser procesado como una petición formal."
+    "free_text": "Este es un texto de prueba suficientemente largo para ser procesado como una petición formal.",
+    "organization_id": "550e8400-e29b-41d4-a716-446655440000",
 }
-

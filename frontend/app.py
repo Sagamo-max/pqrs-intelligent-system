@@ -9,6 +9,7 @@ import streamlit as st
 
 
 API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000").rstrip("/")
+ORGANIZATION_SLUG = os.getenv("ORGANIZATION_SLUG", "demo")
 TICKET_TYPES = [
     "Todos",
     "PETITION",
@@ -39,6 +40,27 @@ EXAMPLE_PQRS = {
         "Mi cédula es 1.234.567 y mi correo es maria@example.com."
     ),
 }
+
+
+@st.cache_data(ttl=300)
+def fetch_organization() -> dict[str, str] | None:
+    """Fetch the active organization used by the public PQRS form."""
+    try:
+        response = httpx.get(
+            _api_url("/api/v1/organizaciones/active"),
+            params={"slug": ORGANIZATION_SLUG},
+            timeout=5,
+        )
+        response.raise_for_status()
+        data = response.json()
+    except (httpx.HTTPError, ValueError) as exc:
+        st.error(f"No se pudo obtener la organización activa: {exc}")
+        return None
+
+    if not isinstance(data, dict) or not data.get("id"):
+        st.error("El backend no devolvió una organización válida.")
+        return None
+    return data
 
 
 def _api_url(path: str) -> str:
@@ -530,6 +552,11 @@ def _render_creation_result() -> None:
 def _creation_page() -> None:
     st.markdown('<div class="main-header">Crear PQRS</div>', unsafe_allow_html=True)
     st.write("Registra una solicitud y observa cómo el motor la clasifica y enruta automáticamente.")
+    organization = fetch_organization()
+    if organization is None:
+        st.error("No se puede crear la PQRS sin una organización activa.")
+        return
+    st.caption(f"Organización: {organization.get('name', ORGANIZATION_SLUG)}")
 
     if st.button("Rellenar con datos de ejemplo", key="fill_example"):
         for key, value in EXAMPLE_PQRS.items():
@@ -597,6 +624,7 @@ def _creation_page() -> None:
                 "phone": phone.strip(),
             },
             "free_text": free_text.strip(),
+            "organization_id": organization["id"],
         }
         try:
             response = httpx.post(

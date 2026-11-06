@@ -1,6 +1,7 @@
 import logging
 import uuid
 from datetime import date
+from uuid import UUID
 
 from sqlalchemy.orm import Session
 
@@ -18,7 +19,9 @@ def generate_tracking_number() -> str:
     return f"PQRS-{uuid.uuid4().hex[:8].upper()}"
 
 
-def create_ticket(db: Session, free_text: str, claimant_id) -> Ticket:
+def create_ticket(
+    db: Session, free_text: str, claimant_id, organization_id: UUID
+) -> Ticket:
     try:
         filing_date = date.today()
 
@@ -26,6 +29,7 @@ def create_ticket(db: Session, free_text: str, claimant_id) -> Ticket:
             tracking_number=generate_tracking_number(),
             original_text=free_text,
             claimant_id=claimant_id,
+            organization_id=organization_id,
             ticket_type=TicketType.PETITION,
             priority="MEDIUM",
             status=TicketStatus.RECEIVED,
@@ -66,6 +70,13 @@ def create_ticket(db: Session, free_text: str, claimant_id) -> Ticket:
 
         db.commit()
         db.refresh(ticket)
+        from app.services.event_publisher import publish_pqrs_created
+
+        publish_pqrs_created(db, ticket)
+        db.commit()
+        from app.services.companero_client import send_pqr_to_companero
+
+        send_pqr_to_companero(db, ticket)
         return ticket
 
     except Exception:

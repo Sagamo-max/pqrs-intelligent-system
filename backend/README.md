@@ -67,6 +67,47 @@ Ejecuta las pruebas con:
 pytest -v
 ```
 
+## Integración con módulo del compañero
+
+Cuando está habilitada, la API envía cada PQRS creada al endpoint REST del
+módulo complementario. El envío es best-effort: si falla, la PQRS permanece
+creada y disponible en el outbox.
+
+Configura estas variables en el `.env`:
+
+```env
+COMPANERO_API_URL=https://tu-url-de-cloudflare-tunnel
+COMPANERO_API_KEY=org_key_xxx
+COMPANERO_API_TIMEOUT_SECONDS=5
+COMPANERO_API_ENABLED=true
+```
+
+Para reintentar manualmente una PQRS, usa el endpoint autenticado con rol
+`MASTER`:
+
+```text
+POST /api/v1/integration/companero/resend/{tracking_number}
+```
+
+## Multi-tenant (organizaciones)
+
+Cada PQRS se vincula a una organización mediante `organization_id`. La
+migración crea una organización demo:
+
+- **ID:** `550e8400-e29b-41d4-a716-446655440000`
+- **Slug:** `demo`
+- **Nombre:** `Organización Demo`
+
+El frontend obtiene la organización activa desde:
+
+```text
+GET /api/v1/organizaciones/active?slug=demo
+```
+
+El slug del frontend se configura con `ORGANIZATION_SLUG` y tiene `demo` como
+valor predeterminado. Esto permite resolver la organización por subdominio o
+configuración en despliegues multi-tenant.
+
 ## Docker
 
 ### Requisitos

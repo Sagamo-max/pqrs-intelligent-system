@@ -17,6 +17,12 @@ class Settings(BaseSettings):
     JWT_REFRESH_SECRET_KEY: str
     JWT_REFRESH_EXPIRE_DAYS: int = 7
 
+    # Integración con el módulo del compañero
+    COMPANERO_API_URL: str = ""
+    COMPANERO_API_KEY: str = ""
+    COMPANERO_API_TIMEOUT_SECONDS: int = 5
+    COMPANERO_API_ENABLED: bool = False
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
