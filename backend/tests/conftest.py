@@ -5,6 +5,13 @@ from dotenv import load_dotenv
 
 load_dotenv()  
 
+# Fallback defaults for isolated unit tests when .env is not present
+os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
+os.environ.setdefault("OPENAI_API_KEY", "test-openai-key")
+os.environ.setdefault("AI_MODEL_NAME", "gpt-6-luna")
+os.environ.setdefault("JWT_SECRET_KEY", "unit-test-jwt-secret")
+os.environ.setdefault("JWT_REFRESH_SECRET_KEY", "unit-test-refresh-secret")
+
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
@@ -19,52 +26,35 @@ from app.schemas.classification import AreaCode, TicketClassification
 from app.services.classifier import ClassificationOutcome
 
 
-_TEST_URL = os.getenv("TEST_DATABASE_URL")
-_DEV_URL = os.getenv("DATABASE_URL")
-
-if not _TEST_URL:
-    raise RuntimeError(
-        "TEST_DATABASE_URL is not set. Tests require a dedicated Postgres "
-        "database (SQLite is not supported because models use JSONB and "
-        "postgresql.UUID). Add TEST_DATABASE_URL to your .env, e.g.:\n"
-        "  TEST_DATABASE_URL=postgresql+psycopg://postgres:admin@localhost:5432/ticket_db_test"
-    )
-
-if _DEV_URL and _TEST_URL == _DEV_URL:
-    raise RuntimeError(
-        "TEST_DATABASE_URL must be different from DATABASE_URL. "
-        "Refusing to run tests against the development database."
-    )
-
-TEST_DATABASE_URL = _TEST_URL
-
-
 # ---------------------------------------------------------------------------
 # SAFETY GUARDS
 # ---------------------------------------------------------------------------
 # This conftest MUST run against a dedicated test database. It used to fall
 # back to the development database URL, which caused `pytest` to DROP the
 # development database. We now require TEST_DATABASE_URL to be set and to be
-# different from DATABASE_URL.
+# different from DATABASE_URL inside `db_engine` so unit tests can run without
+# Postgres.
 
-_TEST_URL = os.getenv("TEST_DATABASE_URL")
-_DEV_URL = os.getenv("DATABASE_URL")
 
-if not _TEST_URL:
-    raise RuntimeError(
-        "TEST_DATABASE_URL is not set. Tests require a dedicated Postgres "
-        "database (SQLite is not supported because models use JSONB and "
-        "postgresql.UUID). Add TEST_DATABASE_URL to your .env, e.g.:\n"
-        "  TEST_DATABASE_URL=postgresql+psycopg://postgres:admin@localhost:5432/ticket_db_test"
-    )
+def _get_validated_test_database_url() -> str:
+    test_url = os.getenv("TEST_DATABASE_URL")
+    dev_url = os.getenv("DATABASE_URL")
 
-if _DEV_URL and _TEST_URL == _DEV_URL:
-    raise RuntimeError(
-        "TEST_DATABASE_URL must be different from DATABASE_URL. "
-        "Refusing to run tests against the development database."
-    )
+    if not test_url:
+        raise RuntimeError(
+            "TEST_DATABASE_URL is not set. Tests require a dedicated Postgres "
+            "database (SQLite is not supported because models use JSONB and "
+            "postgresql.UUID). Add TEST_DATABASE_URL to your .env, e.g.:\n"
+            "  TEST_DATABASE_URL=postgresql+psycopg://postgres:admin@localhost:5432/ticket_db_test"
+        )
 
-TEST_DATABASE_URL = _TEST_URL
+    if dev_url and test_url == dev_url:
+        raise RuntimeError(
+            "TEST_DATABASE_URL must be different from DATABASE_URL. "
+            "Refusing to run tests against the development database."
+        )
+
+    return test_url
 
 
 # ---------------------------------------------------------------------------
@@ -73,7 +63,8 @@ TEST_DATABASE_URL = _TEST_URL
 
 @pytest.fixture(scope="session")
 def db_engine():
-    engine = create_engine(TEST_DATABASE_URL, future=True)
+    test_database_url = _get_validated_test_database_url()
+    engine = create_engine(test_database_url, future=True)
     
     with engine.begin() as conn:
         conn.execute(text("DROP SCHEMA public CASCADE"))

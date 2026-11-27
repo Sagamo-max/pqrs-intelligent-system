@@ -11,7 +11,7 @@ class AIAudit(Base):
     __tablename__ = "ai_audits"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    ticket_id = Column(UUID(as_uuid=True), ForeignKey("tickets.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    ticket_id = Column(UUID(as_uuid=True), ForeignKey("tickets.id", ondelete="CASCADE"), nullable=False, unique=False, index=True)
 
     ai_model = Column(String(50), nullable=False)
     provider = Column(String(20), nullable=False)
@@ -40,6 +40,7 @@ class ChangeAudit(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     ticket_id = Column(UUID(as_uuid=True), ForeignKey("tickets.id", ondelete="CASCADE"), nullable=False, index=True)
+    funcionario_id = Column(UUID(as_uuid=True), ForeignKey("funcionarios.id", ondelete="SET NULL"), nullable=True, index=True)
 
     responsible_user = Column(String(100), nullable=False)
     event_type = Column(String(50), nullable=False)
@@ -51,3 +52,4 @@ class ChangeAudit(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     ticket = relationship("Ticket", back_populates="change_audits")
+    funcionario = relationship("Funcionario")
