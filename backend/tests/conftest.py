@@ -10,6 +10,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
 from app.core.auth_deps import get_current_user
+from app.core.config import settings
 from app.core.database import Base, get_db
 from app.main import app
 from app.models.area import Area
@@ -37,6 +38,12 @@ if _DEV_URL and _TEST_URL == _DEV_URL:
     )
 
 TEST_DATABASE_URL = _TEST_URL
+
+
+@pytest.fixture(autouse=True)
+def disable_companero_api_for_tests(mocker):
+    """Prevent integration tests from sending requests to the real API."""
+    mocker.patch.object(settings, "COMPANERO_API_ENABLED", False)
 
 
 # ---------------------------------------------------------------------------
