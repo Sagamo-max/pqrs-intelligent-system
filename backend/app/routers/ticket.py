@@ -7,14 +7,17 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.core.database import get_db
 from app.core.auth_deps import get_current_user
+from app.core.database import get_db
 from app.models.funcionario import FuncionarioRole
 from app.models.ticket import Ticket
 from app.schemas.classification import TicketClassification
 from app.schemas.ticket import (
+    TicketAreaReassignRequest,
     TicketCreate,
+    TicketDetailResponse,
     TicketListResponse,
+    TicketPriorityChangeRequest,
     TicketResponse,
     TicketTypeChangeRequest,
 )
@@ -22,7 +25,13 @@ from app.services.change_audit_service import create_change_audit
 from app.services.claimant_service import get_or_create_claimant
 from app.services.classifier import classify_ticket_text
 from app.services.sla import calculate_due_date
-from app.services.ticket_service import create_ticket
+from app.services.ticket_service import (
+    change_ticket_priority,
+    create_ticket,
+    get_ticket_by_identifier,
+    get_ticket_detail,
+    reassign_ticket_area,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(
@@ -148,10 +157,7 @@ def change_ticket_type(
     - Registra el cambio en `ChangeAudit` con quién lo hizo, valores
         anterior/nuevo y motivo.
     """
-    stmt = select(Ticket).where(Ticket.tracking_number == tracking_number)
-    if current_user.role == FuncionarioRole.ANALISTA:
-        stmt = stmt.where(Ticket.area_id == current_user.area_id)
-    ticket = db.scalar(stmt)
+    ticket = get_ticket_by_identifier(db, tracking_number, current_user)
     if not ticket:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Ticket not found")
 
@@ -185,6 +191,7 @@ def change_ticket_type(
     create_change_audit(
         db=db,
         ticket_id=ticket.id,
+        funcionario_id=getattr(current_user, "id", None),
         responsible_user=payload.responsible_user,
         event_type="TICKET_TYPE_CHANGE",
         modified_field="ticket_type",
@@ -196,3 +203,63 @@ def change_ticket_type(
     db.commit()
     db.refresh(ticket)
     return TicketResponse.model_validate(ticket)
+
+
+@router.patch(
+    "/{ticket_id}/area",
+    response_model=TicketResponse,
+    status_code=status.HTTP_200_OK,
+)
+def reassign_area_endpoint(
+    ticket_id: str,
+    payload: TicketAreaReassignRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Reasigna manualmente el área responsable de una PQRS sin alterar estado ni SLA (HU-15)."""
+    ticket = reassign_ticket_area(
+        db=db,
+        identifier=ticket_id,
+        area_id=payload.area_id,
+        current_user=current_user,
+        change_reason=payload.change_reason,
+        responsible_user=payload.responsible_user,
+    )
+    return TicketResponse.model_validate(ticket)
+
+
+@router.patch(
+    "/{ticket_id}/prioridad",
+    response_model=TicketResponse,
+    status_code=status.HTTP_200_OK,
+)
+def change_priority_endpoint(
+    ticket_id: str,
+    payload: TicketPriorityChangeRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Modifica manualmente la prioridad de una PQRS y registra intervención humana (HU-18)."""
+    ticket = change_ticket_priority(
+        db=db,
+        identifier=ticket_id,
+        new_priority=payload.priority,
+        current_user=current_user,
+        change_reason=payload.change_reason,
+        responsible_user=payload.responsible_user,
+    )
+    return TicketResponse.model_validate(ticket)
+
+
+@router.get(
+    "/{ticket_id}",
+    response_model=TicketDetailResponse,
+    status_code=status.HTTP_200_OK,
+)
+def get_ticket_detail_endpoint(
+    ticket_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Devuelve detalle completo de PQRS con solicitante, IA, SLA y línea de tiempo (HU-16)."""
+    return get_ticket_detail(db=db, identifier=ticket_id, current_user=current_user)

@@ -54,6 +54,7 @@ class Ticket(Base):
 
     claimant = relationship("Claimant", back_populates="tickets")
     area = relationship("Area", back_populates="tickets")
-    ai_audit = relationship("AIAudit", back_populates="ticket", uselist=False, cascade="all, delete-orphan")
+    ai_audit = relationship("AIAudit", uselist=False, viewonly=True, order_by="AIAudit.created_at.desc()")
+    ai_audits = relationship("AIAudit", back_populates="ticket", order_by="AIAudit.created_at.asc()", cascade="all, delete-orphan")
     change_audits = relationship("ChangeAudit", back_populates="ticket", cascade="all, delete-orphan")
     ai_audit_attempts = relationship("AIAuditAttempt", back_populates="ticket", cascade="all, delete-orphan")
