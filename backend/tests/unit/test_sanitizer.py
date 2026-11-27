@@ -1,3 +1,4 @@
+import difflib
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -7,8 +8,10 @@ import pytest
 
 from app.services import sanitizer_service
 from app.services.sanitizer_service import (
+    _NER_LABELS_TO_IGNORE,
     _OPERATORS,
     _PRESIDIO_AVAILABLE,
+    _nlp_config,
     mask_ner_patterns,
     mask_regex_patterns,
     sanitize_text,
@@ -18,6 +21,9 @@ _REQUIRES_PRESIDIO = pytest.mark.skipif(
     not _PRESIDIO_AVAILABLE,
     reason="Requiere presidio-analyzer + spaCy (es_core_news_md) instalados en el entorno",
 )
+
+_BANK_PATH = Path(__file__).resolve().parents[3] / "data" / "banco_pruebas" / "banco_pqrs_sintetico.json"
+_BANK_RECORDS = json.loads(_BANK_PATH.read_text(encoding="utf-8"))
 
 
 @pytest.mark.unit
@@ -161,29 +167,28 @@ def test_sanitize_multiple_pii():
     assert "900.123.456-7" not in result
 
 
-# =====================================================================
-# Pruebas añadidas en auditoría (mocks NER, placeholders, delimitadores,
-# ofuscación, idempotencia, casos borde y banco sintético)
-# =====================================================================
-
-
 @pytest.mark.unit
 def test_sanitize_ner_with_mocked_presidio_pipeline(monkeypatch):
-    """Permite validar el flujo Presidio/NER en CI sin descargar es_core_news_md."""
+    """Permite validar el flujo Presidio/NER y filtros post-NER sin depender de es_core_news_md."""
     fake_analyzer = MagicMock()
-    fake_analyzer.analyze.return_value = [SimpleNamespace(entity_type="PERSON", start=13, end=23)]
+    fake_analyzer.analyze.return_value = [
+        SimpleNamespace(entity_type="PERSON", start=0, end=9, score=0.85),  # "Agradezco" (filtrado)
+        SimpleNamespace(entity_type="PERSON", start=24, end=34, score=0.85),  # "Juan Pérez" (conservado)
+    ]
     fake_anonymizer = MagicMock()
     fake_anonymizer.anonymize.return_value = SimpleNamespace(
-        text="Mi nombre es [MASKED_NAME] y mi cédula es [MASKED_DOCUMENT]"
+        text="Agradezco la gestión de [MASKED_NAME]."
     )
 
     monkeypatch.setattr(sanitizer_service, "_analyzer", fake_analyzer)
     monkeypatch.setattr(sanitizer_service, "_anonymizer", fake_anonymizer)
 
-    out = sanitize_text("Mi nombre es Juan Pérez y mi cédula es 12345678")
-    assert out == "Mi nombre es [MASKED_NAME] y mi cédula es [MASKED_DOCUMENT]"
+    out = sanitize_text("Agradezco la gestión de Juan Pérez.")
+    assert out == "Agradezco la gestión de [MASKED_NAME]."
     fake_analyzer.analyze.assert_called_once()
-    fake_anonymizer.anonymize.assert_called_once()
+    passed_results = fake_anonymizer.anonymize.call_args.kwargs["analyzer_results"]
+    assert len(passed_results) == 1
+    assert passed_results[0].start == 24
 
 
 @pytest.mark.unit
@@ -265,9 +270,81 @@ def test_sanitize_edge_cases_none_empty_long_unicode_regionalisms():
 
 @pytest.mark.unit
 def test_sanitize_synthetic_bank_120_records_unchanged():
-    bank_path = Path(__file__).resolve().parents[3] / "data" / "banco_pruebas" / "banco_pqrs_sintetico.json"
-    records = json.loads(bank_path.read_text(encoding="utf-8"))
-    assert len(records) == 120
-    for rec in records:
+    assert len(_BANK_RECORDS) == 120
+    for rec in _BANK_RECORDS:
         txt = rec["texto_solicitud"]
         assert sanitize_text(txt) == txt, f"Falso positivo detectado en {rec['id']}"
+
+
+# =====================================================================
+# Pruebas obligatorias de corrección NER (Capas A + B + C)
+# =====================================================================
+
+
+@pytest.mark.unit
+def test_sanitize_does_not_mask_courtesy_verbs():
+    texts = [
+        "Agradezco de antemano su pronta colaboración con el trámite.",
+        "Solicito amablemente copia del paz y salvo.",
+        "Manifiesto mi inconformidad con la demora presentada.",
+        "Atentamente, coordinación administrativa.",
+        "Cordialmente remito los documentos adjuntos.",
+    ]
+    for text in texts:
+        result = sanitize_text(text)
+        assert result == text, f"Se enmascaró indebidamente: {text!r} -> {result!r}"
+        assert "[MASKED_NAME]" not in result
+
+
+@pytest.mark.unit
+def test_sanitize_does_not_mask_sentence_initial_capitals():
+    text = (
+        "Se radicó la solicitud el lunes pasado. Pueden confirmar el estado pronto.\n"
+        "Había quedado pendiente la revisión.\n"
+        "Previamente enviamos los anexos requeridos. Brindar respuesta oportuna es clave."
+    )
+    assert sanitize_text(text) == text
+
+
+@_REQUIRES_PRESIDIO
+@pytest.mark.unit
+def test_sanitize_still_masks_real_names():
+    samples = [
+        ("El ciudadano Juan Pérez radicó la solicitud.", "Juan Pérez"),
+        ("Soy María Rodríguez y requiero respuesta urgente.", "María Rodríguez"),
+        ("Atentamente, Carlos Andrés Gómez.", "Carlos Andrés Gómez"),
+    ]
+    for text, real_name in samples:
+        result = sanitize_text(text)
+        assert "[MASKED_NAME]" in result, f"No se enmascaró nombre real en {text!r}"
+        assert real_name not in result
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("record", _BANK_RECORDS, ids=[r["id"] for r in _BANK_RECORDS])
+def test_sanitize_synthetic_bank_120_records_unchanged_ner(record):
+    txt = record["texto_solicitud"]
+    sanitized = sanitize_text(txt)
+    if sanitized != txt:
+        diff = "".join(
+            difflib.unified_diff(
+                txt.splitlines(keepends=True),
+                sanitized.splitlines(keepends=True),
+                fromfile=f"{record['id']}_original",
+                tofile=f"{record['id']}_sanitized",
+            )
+        )
+        pytest.fail(f"Falso positivo NER en {record['id']}:\n{diff}")
+
+
+@pytest.mark.unit
+def test_sanitize_misc_label_ignored():
+    labels_to_ignore = _nlp_config.get("ner_model_configuration", {}).get("labels_to_ignore", [])
+    assert "MISC" in _NER_LABELS_TO_IGNORE
+    assert "MISC" in labels_to_ignore
+
+    # Si Presidio está activo, un término típicamente MISC (ej. "Ley 1755" o "PQRS") no produce [MASKED_NAME]
+    text = "En cumplimiento de la Ley 1755 sobre PQRS ante la DIAN y SECOP."
+    result = sanitize_text(text)
+    assert "[MASKED_NAME]" not in result
+    assert result == text
