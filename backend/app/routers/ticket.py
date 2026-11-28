@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.auth_deps import get_current_user
 from app.core.database import get_db
+from app.core.rate_limit import enforce_public_pqrs_rate_limit
 from app.models.funcionario import FuncionarioRole
 from app.models.ticket import Ticket
 from app.schemas.classification import TicketClassification
@@ -37,7 +38,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(
     prefix="/pqrs",
     tags=["Tickets"],
-    dependencies=[Depends(get_current_user)],
 )
 
 
@@ -46,7 +46,10 @@ class TicketClassificationRequest(BaseModel):
 
 
 @router.post("/classify-poc", response_model=TicketClassification)
-def classify_ticket(payload: TicketClassificationRequest):
+def classify_ticket(
+    payload: TicketClassificationRequest,
+    _: object = Depends(get_current_user),
+):
     try:
         return classify_ticket_text(payload.text)
     except Exception as e:
@@ -55,7 +58,11 @@ def classify_ticket(payload: TicketClassificationRequest):
 
 
 @router.post("/", response_model=TicketResponse, status_code=status.HTTP_201_CREATED)
-def submit_ticket(request: TicketCreate, db: Session = Depends(get_db)):
+def submit_ticket(
+    request: TicketCreate,
+    db: Session = Depends(get_db),
+    _: None = Depends(enforce_public_pqrs_rate_limit),
+):
     try:
         claimant = get_or_create_claimant(db=db, claimant_data=request.claimant)
 

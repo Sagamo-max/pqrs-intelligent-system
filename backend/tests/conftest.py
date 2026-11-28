@@ -18,6 +18,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.core.auth_deps import get_current_user
 from app.core.database import Base, get_db
+from app.core.rate_limit import public_pqrs_rate_limiter
 from app.main import app
 from app.models.area import Area
 from app.models.funcionario import Funcionario, FuncionarioRole
@@ -99,6 +100,13 @@ def db_session(db_engine):
 # ---------------------------------------------------------------------------
 # FASTAPI CLIENT
 # ---------------------------------------------------------------------------
+
+@pytest.fixture(autouse=True)
+def reset_public_rate_limiter():
+    public_pqrs_rate_limiter.reset()
+    yield
+    public_pqrs_rate_limiter.reset()
+
 
 @pytest.fixture(scope="function")
 def client(db_session):
