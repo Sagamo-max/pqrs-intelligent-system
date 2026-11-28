@@ -252,9 +252,7 @@ export function AdminLayout() {
             </Button>
             <div className="hidden sm:block">
               <p className="text-sm font-semibold text-foreground">Consola Operativa PQRS</p>
-              <p className="text-xs text-muted-foreground">
-                Triaje inteligente y cumplimiento SLA
-              </p>
+              <p className="text-xs text-muted-foreground">Triaje inteligente y cumplimiento SLA</p>
             </div>
           </div>
 

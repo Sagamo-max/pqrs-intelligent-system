@@ -42,8 +42,7 @@ export function AlertsPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Alertas de vencimiento SLA</h1>
           <p className="text-sm text-muted-foreground">
-            Solicitudes abiertas vencidas o próximas a vencer dentro de los próximos 3 días
-            hábiles.
+            Solicitudes abiertas vencidas o próximas a vencer dentro de los próximos 3 días hábiles.
           </p>
         </div>
 
@@ -99,9 +98,7 @@ export function AlertsPage() {
               <tbody className="divide-y">
                 {alerts.map((item) => (
                   <tr key={item.id} className="hover:bg-muted/30">
-                    <td className="px-4 py-3 font-semibold text-primary">
-                      {item.tracking_number}
-                    </td>
+                    <td className="px-4 py-3 font-semibold text-primary">{item.tracking_number}</td>
                     <td className="px-4 py-3">
                       <AlertLevelBadge level={item.alert_level} />
                     </td>

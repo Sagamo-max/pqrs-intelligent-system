@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, Bot, CheckCircle2, Clock, FileText, RefreshCw } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, FileText, RefreshCw } from 'lucide-react';
 import {
   Area,
   AreaChart,
@@ -14,27 +14,34 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { fetchDashboardMetrics } from '@/api/dashboard';
+import { fetchDashboardMetrics, getClassificationStats } from '@/api/dashboard';
 import { EmptyState } from '@/components/common/EmptyState';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { formatDateTimeCO } from '@/lib/dates';
 import { normalizeApiError } from '@/lib/errors';
+import { getPriorityLabel, getTicketTypeLabel } from '@/lib/labels';
 import { useAuthStore } from '@/stores/authStore';
 
-const SLA_COLORS = ['#15803d', '#b45309', '#b91c1c'];
+const SLA_COLORS = ['#15803d', '#b91c1c', '#64748b'];
 const SOURCE_COLORS = ['#1d4ed8', '#0f766e', '#d97706'];
 
 export function DashboardPage() {
   const user = useAuthStore((state) => state.user);
 
-  const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
+  const metricsQuery = useQuery({
     queryKey: ['dashboard-metrics'],
     queryFn: fetchDashboardMetrics,
   });
 
-  if (isLoading) {
+  const statsQuery = useQuery({
+    queryKey: ['classification-stats'],
+    queryFn: getClassificationStats,
+  });
+
+  if (metricsQuery.isLoading) {
     return (
       <div className="space-y-6" aria-busy="true" aria-label="Cargando métricas">
         <Skeleton className="h-9 w-64" />
@@ -52,14 +59,14 @@ export function DashboardPage() {
     );
   }
 
-  if (isError || !data) {
-    const normalized = normalizeApiError(error);
+  if (metricsQuery.isError || !metricsQuery.data) {
+    const normalized = normalizeApiError(metricsQuery.error);
     return (
       <Alert variant="destructive" role="alert">
         <AlertTitle>No fue posible cargar el dashboard</AlertTitle>
         <AlertDescription className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <span>{normalized.message}</span>
-          <Button variant="outline" size="sm" onClick={() => refetch()}>
+          <Button variant="outline" size="sm" onClick={() => metricsQuery.refetch()}>
             Reintentar
           </Button>
         </AlertDescription>
@@ -67,9 +74,44 @@ export function DashboardPage() {
     );
   }
 
-  const aiTotal = data.classificationStats.all_time.total;
-  const openAiPct =
-    aiTotal > 0 ? Math.round((data.classificationStats.all_time.by_source.openai / aiTotal) * 100) : 0;
+  const data = metricsQuery.data;
+  const stats = statsQuery.data;
+
+  const byType = Object.entries(data.por_tipo).map(([key, value]) => ({
+    name: getTicketTypeLabel(key),
+    value,
+  }));
+
+  const byPriority = Object.entries(data.por_prioridad).map(([key, value]) => ({
+    name: getPriorityLabel(key),
+    value,
+  }));
+
+  const byArea = data.por_area.map((item) => ({
+    name: item.area_name,
+    value: item.total,
+  }));
+
+  const slaBreakdown = [
+    { name: 'A tiempo', value: data.cumplimiento_sla.a_tiempo },
+    { name: 'Vencidas', value: data.cumplimiento_sla.vencidas },
+    { name: 'Sin fecha SLA', value: data.cumplimiento_sla.sin_fecha_sla },
+  ].filter((item) => item.value > 0);
+
+  const sourceBreakdown = stats
+    ? [
+        { name: 'OpenAI', value: stats.all_time.by_source.openai },
+        { name: 'Heurística', value: stats.all_time.by_source.heuristic },
+        { name: 'Fallback', value: stats.all_time.by_source.fallback },
+      ]
+    : [];
+
+  const sparklineData = [
+    { label: 'A tiempo', total: data.cumplimiento_sla.a_tiempo },
+    { label: 'Sin SLA', total: data.cumplimiento_sla.sin_fecha_sla },
+    { label: 'Vencidas', total: data.cumplimiento_sla.vencidas },
+    { label: 'Total', total: data.total_pqrs },
+  ];
 
   return (
     <div className="space-y-6">
@@ -77,17 +119,20 @@ export function DashboardPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Dashboard de Triaje PQRS</h1>
           <p className="text-sm text-muted-foreground">
-            Resumen operativo por tipo, área, prioridad y cumplimiento SLA.
+            Métricas en tiempo real · Actualizado {formatDateTimeCO(data.generated_at)}
           </p>
         </div>
         <Button
           variant="outline"
           size="sm"
-          onClick={() => refetch()}
-          disabled={isFetching}
+          onClick={() => {
+            metricsQuery.refetch();
+            statsQuery.refetch();
+          }}
+          disabled={metricsQuery.isFetching}
         >
           <RefreshCw
-            className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`}
+            className={`h-4 w-4 ${metricsQuery.isFetching ? 'animate-spin' : ''}`}
             aria-hidden="true"
           />
           Actualizar
@@ -98,13 +143,12 @@ export function DashboardPage() {
         <Alert variant="info">
           <AlertTitle>Vista filtrada por área</AlertTitle>
           <AlertDescription>
-            Como Analista, las métricas mostradas corresponden exclusivamente a las PQRS asignadas
-            a tu área.
+            Como Analista, las métricas mostradas corresponden exclusivamente a las PQRS asignadas a
+            tu área.
           </AlertDescription>
         </Alert>
       ) : null}
 
-      {/* KPI Cards con sparkline */}
       <section aria-label="Indicadores clave" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -112,11 +156,11 @@ export function DashboardPage() {
             <FileText className="h-4 w-4 text-primary" aria-hidden="true" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{data.totalTickets}</div>
-            <p className="text-xs text-muted-foreground">Muestra reciente: {data.sampleSize}</p>
+            <div className="text-2xl font-bold">{data.total_pqrs}</div>
+            <p className="text-xs text-muted-foreground">Registradas en el alcance actual</p>
             <div className="mt-2 h-10 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={data.recentTrend}>
+                <AreaChart data={sparklineData}>
                   <Area
                     type="monotone"
                     dataKey="total"
@@ -137,42 +181,43 @@ export function DashboardPage() {
             <AlertTriangle className="h-4 w-4 text-destructive" aria-hidden="true" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-destructive">{data.overdueCount}</div>
+            <div className="text-2xl font-bold text-destructive">
+              {data.cumplimiento_sla.vencidas}
+            </div>
             <p className="text-xs text-muted-foreground">Requieren atención inmediata</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Próximas a vencer
-            </CardTitle>
-            <Clock className="h-4 w-4 text-warning" aria-hidden="true" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">A tiempo</CardTitle>
+            <CheckCircle2 className="h-4 w-4 text-success" aria-hidden="true" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-warning">{data.dueSoonCount}</div>
-            <p className="text-xs text-muted-foreground">Dentro de los próximos 3 días hábiles</p>
+            <div className="text-2xl font-bold text-success">{data.cumplimiento_sla.a_tiempo}</div>
+            <p className="text-xs text-muted-foreground">
+              Cumplimiento SLA: {data.cumplimiento_sla.porcentaje_a_tiempo.toFixed(1)}%
+            </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              A tiempo / IA OpenAI
+              Sin fecha SLA
             </CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-success" aria-hidden="true" />
+            <Clock className="h-4 w-4 text-warning" aria-hidden="true" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-success">{data.onTimeCount}</div>
-            <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-              <Bot className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
-              {openAiPct}% clasificadas vía OpenAI ({aiTotal} totales)
-            </p>
+            <div className="text-2xl font-bold text-warning">
+              {data.cumplimiento_sla.sin_fecha_sla}
+            </div>
+            <p className="text-xs text-muted-foreground">Pendientes de validación humana</p>
           </CardContent>
         </Card>
       </section>
 
-      {data.totalTickets === 0 ? (
+      {data.total_pqrs === 0 ? (
         <EmptyState
           title="Aún no hay PQRS registradas"
           description="Cuando existan solicitudes radicadas podrás visualizar las distribuciones por tipo, área, prioridad y cumplimiento SLA."
@@ -182,11 +227,11 @@ export function DashboardPage() {
           <Card>
             <CardHeader>
               <CardTitle>Distribución por tipo de PQRS</CardTitle>
-              <CardDescription>Sobre las últimas {data.sampleSize} solicitudes</CardDescription>
+              <CardDescription>Totales agrupados por categoría</CardDescription>
             </CardHeader>
             <CardContent className="h-72">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={data.byType} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
+                <BarChart data={byType} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
                   <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
@@ -199,14 +244,16 @@ export function DashboardPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Estado de cumplimiento SLA</CardTitle>
-              <CardDescription>Solicitudes abiertas a tiempo vs críticas</CardDescription>
+              <CardTitle>Cumplimiento SLA</CardTitle>
+              <CardDescription>
+                {data.cumplimiento_sla.porcentaje_a_tiempo.toFixed(1)}% dentro del plazo legal
+              </CardDescription>
             </CardHeader>
             <CardContent className="h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={data.slaBreakdown}
+                    data={slaBreakdown}
                     dataKey="value"
                     nameKey="name"
                     cx="50%"
@@ -216,7 +263,7 @@ export function DashboardPage() {
                     paddingAngle={3}
                     label
                   >
-                    {data.slaBreakdown.map((entry, idx) => (
+                    {slaBreakdown.map((entry, idx) => (
                       <Cell key={entry.name} fill={SLA_COLORS[idx % SLA_COLORS.length]} />
                     ))}
                   </Pie>
@@ -229,20 +276,20 @@ export function DashboardPage() {
           <Card>
             <CardHeader>
               <CardTitle>Distribución por área</CardTitle>
-              <CardDescription>Top áreas receptoras</CardDescription>
+              <CardDescription>Solicitudes asignadas por dependencia</CardDescription>
             </CardHeader>
             <CardContent className="h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
-                  data={data.byArea}
+                  data={byArea}
                   layout="vertical"
                   margin={{ top: 8, right: 16, left: 24, bottom: 8 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
                   <XAxis type="number" allowDecimals={false} tick={{ fontSize: 12 }} />
-                  <YAxis type="category" dataKey="name" width={130} tick={{ fontSize: 11 }} />
+                  <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 11 }} />
                   <Tooltip />
-                  <Bar dataKey="value" name="Tickets" fill="#0f766e" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="value" name="PQRS" fill="#0f766e" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -250,46 +297,50 @@ export function DashboardPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Prioridad y fuentes de clasificación</CardTitle>
+              <CardTitle>Prioridad y motor de triaje</CardTitle>
               <CardDescription>
-                Últimas 24h: {data.classificationStats.last_24h.total} clasificaciones
+                {stats
+                  ? `Últimas 24h: ${stats.last_24h.total} clasificaciones`
+                  : 'Distribución por nivel de prioridad'}
               </CardDescription>
             </CardHeader>
-            <CardContent className="grid gap-4 sm:grid-cols-2">
-              <div className="h-60">
+            <CardContent className={stats ? 'grid gap-4 sm:grid-cols-2' : 'h-72'}>
+              <div className={stats ? 'h-60' : 'h-full'}>
                 <p className="mb-2 text-xs font-semibold text-muted-foreground">Por prioridad</p>
                 <ResponsiveContainer width="100%" height="90%">
-                  <BarChart data={data.byPriority}>
+                  <BarChart data={byPriority}>
                     <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                     <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
                     <Tooltip />
-                    <Bar dataKey="value" name="Tickets" fill="#d97706" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="value" name="PQRS" fill="#d97706" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-              <div className="h-60">
-                <p className="mb-2 text-xs font-semibold text-muted-foreground">
-                  Motor de clasificación
-                </p>
-                <ResponsiveContainer width="100%" height="90%">
-                  <PieChart>
-                    <Pie
-                      data={data.sourceBreakdown}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={68}
-                      label
-                    >
-                      {data.sourceBreakdown.map((entry, idx) => (
-                        <Cell key={entry.name} fill={SOURCE_COLORS[idx % SOURCE_COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
+              {stats ? (
+                <div className="h-60">
+                  <p className="mb-2 text-xs font-semibold text-muted-foreground">
+                    Fuente de clasificación
+                  </p>
+                  <ResponsiveContainer width="100%" height="90%">
+                    <PieChart>
+                      <Pie
+                        data={sourceBreakdown}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={68}
+                        label
+                      >
+                        {sourceBreakdown.map((entry, idx) => (
+                          <Cell key={entry.name} fill={SOURCE_COLORS[idx % SOURCE_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : null}
             </CardContent>
           </Card>
         </div>

@@ -14,9 +14,7 @@ export async function login(payload: LoginRequest): Promise<TokenResponse> {
 
 export async function fetchMe(accessTokenOverride?: string): Promise<FuncionarioOut> {
   const { data } = await authClient.get<FuncionarioOut>('/me', {
-    headers: accessTokenOverride
-      ? { Authorization: `Bearer ${accessTokenOverride}` }
-      : undefined,
+    headers: accessTokenOverride ? { Authorization: `Bearer ${accessTokenOverride}` } : undefined,
   });
   return data;
 }

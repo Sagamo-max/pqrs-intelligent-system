@@ -136,7 +136,11 @@ export function FuncionariosPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="func-username">Usuario *</Label>
-                <Input id="func-username" placeholder="Ej. analista_cartera" {...register('username')} />
+                <Input
+                  id="func-username"
+                  placeholder="Ej. analista_cartera"
+                  {...register('username')}
+                />
                 {errors.username ? (
                   <p className="text-xs text-destructive">{errors.username.message}</p>
                 ) : null}
@@ -144,7 +148,11 @@ export function FuncionariosPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="func-fullname">Nombre completo</Label>
-                <Input id="func-fullname" placeholder="Ej. Laura Gómez" {...register('full_name')} />
+                <Input
+                  id="func-fullname"
+                  placeholder="Ej. Laura Gómez"
+                  {...register('full_name')}
+                />
               </div>
 
               <div className="space-y-2">

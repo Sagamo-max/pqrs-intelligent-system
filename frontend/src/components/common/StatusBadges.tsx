@@ -43,7 +43,6 @@ export function AlertLevelBadge({ level }: { level: AlertLevel | string }) {
 }
 
 export function RoleBadge({ role }: { role: FuncionarioRole | string }) {
-  const variant =
-    role === 'MASTER' ? 'default' : role === 'SUPERVISOR' ? 'info' : 'secondary';
+  const variant = role === 'MASTER' ? 'default' : role === 'SUPERVISOR' ? 'info' : 'secondary';
   return <Badge variant={variant}>{getRoleLabel(role)}</Badge>;
 }

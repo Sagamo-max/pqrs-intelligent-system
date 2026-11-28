@@ -21,11 +21,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDateCO, formatDateTimeCO } from '@/lib/dates';
 import { normalizeApiError } from '@/lib/errors';
-import {
-  TICKET_PRIORITY_LABELS,
-  TICKET_STATUS_LABELS,
-  TICKET_TYPE_LABELS,
-} from '@/lib/labels';
+import { TICKET_PRIORITY_LABELS, TICKET_STATUS_LABELS, TICKET_TYPE_LABELS } from '@/lib/labels';
 import type { TicketPriority, TicketStatus, TicketType } from '@/types/api';
 
 const PAGE_SIZE = 15;
@@ -44,10 +40,7 @@ export function PqrsListPage() {
   });
 
   const ticketsQuery = useQuery({
-    queryKey: [
-      'tickets',
-      { statusFilter, priorityFilter, areaFilter, typeFilter, offset },
-    ],
+    queryKey: ['tickets', { statusFilter, priorityFilter, areaFilter, typeFilter, offset }],
     queryFn: () =>
       listTickets({
         status: statusFilter !== 'ALL' ? (statusFilter as TicketStatus) : undefined,

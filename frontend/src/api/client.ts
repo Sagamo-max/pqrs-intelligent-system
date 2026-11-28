@@ -1,20 +1,17 @@
-import axios, {
-  type AxiosError,
-  type AxiosInstance,
-  type InternalAxiosRequestConfig,
-} from 'axios';
+import axios, { type AxiosError, type AxiosInstance, type InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '@/stores/authStore';
 import type { TokenResponse } from '@/types/api';
 
-const rawBaseUrl = (
-  import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
-).replace(/\/+$/, '');
+const rawBaseUrl = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1').replace(
+  /\/+$/,
+  '',
+);
 
 export const API_V1_BASE_URL = rawBaseUrl;
 
 /**
- * TODO(backend-auth-prefix): El backend actual expone Auth bajo `/api/auth` en lugar de `/api/v1/auth`.
- * Derivamos el origen removiendo `/api/v1` cuando esté presente en `VITE_API_BASE_URL`.
+ * El backend expone el router de autenticación en `/api/auth/*` (sin segmento `/v1`),
+ * mientras que los recursos PQRS, Áreas, Alertas y Dashboard usan `/api/v1/*` (y `/api/*`).
  */
 export const API_ORIGIN = rawBaseUrl.replace(/\/api\/v1$/i, '');
 export const AUTH_BASE_URL = `${API_ORIGIN}/api/auth`;
@@ -91,7 +88,11 @@ function attachInterceptors(instance: AxiosInstance): AxiosInstance {
         }
 
         const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
-        if (currentPath !== '/login' && currentPath !== '/radicar' && typeof window !== 'undefined') {
+        if (
+          currentPath !== '/login' &&
+          currentPath !== '/radicar' &&
+          typeof window !== 'undefined'
+        ) {
           window.location.replace('/login');
         }
       }

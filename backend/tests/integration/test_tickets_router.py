@@ -134,3 +134,43 @@ def test_audit_attempts_persisted(
     ).one()
     attempts = db_session.query(AIAuditAttempt).filter_by(ticket_id=ticket.id).all()
     assert len(attempts) == 2
+
+
+@pytest.mark.integration
+def test_receive_pqrs_public_no_auth(
+    auth_client, seed_areas, sample_ticket_payload, mock_openai_classification
+):
+    mock_openai_classification()
+    response = auth_client.post("/api/v1/pqrs/", json=sample_ticket_payload)
+
+    assert response.status_code == 201
+    data = response.json()
+    assert "tracking_number" in data
+    assert data["status"] == "RECEIVED"
+
+
+@pytest.mark.integration
+def test_list_pqrs_requires_auth(auth_client):
+    response = auth_client.get("/api/v1/pqrs/")
+    assert response.status_code == 401
+
+
+@pytest.mark.integration
+def test_receive_pqrs_rate_limit(
+    auth_client,
+    seed_areas,
+    sample_ticket_payload,
+    mock_openai_classification,
+    monkeypatch,
+):
+    mock_openai_classification()
+    monkeypatch.setenv("PUBLIC_PQRS_RATE_LIMIT_MAX", "2")
+    monkeypatch.setenv("PUBLIC_PQRS_RATE_LIMIT_WINDOW_SECONDS", "60")
+
+    first = auth_client.post("/api/v1/pqrs/", json=sample_ticket_payload)
+    second = auth_client.post("/api/v1/pqrs/", json=sample_ticket_payload)
+    third = auth_client.post("/api/v1/pqrs/", json=sample_ticket_payload)
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert third.status_code == 429

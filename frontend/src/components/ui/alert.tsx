@@ -21,15 +21,16 @@ const alertVariants = cva('relative w-full rounded-lg border p-4 text-sm', {
 });
 
 export interface AlertProps
-  extends React.HTMLAttributes<HTMLDivElement>,
-    VariantProps<typeof alertVariants> {}
+  extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof alertVariants> {}
 
 export function Alert({ className, variant, ...props }: AlertProps) {
   return <div className={cn(alertVariants({ variant }), className)} {...props} />;
 }
 
 export function AlertTitle({ className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
-  return <h4 className={cn('mb-1 font-semibold leading-none tracking-tight', className)} {...props} />;
+  return (
+    <h4 className={cn('mb-1 font-semibold leading-none tracking-tight', className)} {...props} />
+  );
 }
 
 export function AlertDescription({

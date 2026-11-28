@@ -51,7 +51,7 @@ restartPolicyMaxRetries = 3
      ```env
      CORS_ORIGINS=https://${{frontend.RAILWAY_PUBLIC_DOMAIN}}
      ```
-   - **Nota sobre el backend actual:** verifica que `backend/app/main.py` tenga habilitado `CORSMiddleware` leyendo `CORS_ORIGINS` (actualmente no viene configurado en el código base de `backend/`).
+   - `backend/app/main.py` lee `CORS_ORIGINS` (lista separada por comas; en local permite por defecto `http://localhost:5173,http://localhost:3000`) y la aplica en `CORSMiddleware` con `allow_credentials=True`.
    - Haz **Redeploy** en ambos servicios (`backend` y `frontend`) tras guardar las variables.
 
 ---

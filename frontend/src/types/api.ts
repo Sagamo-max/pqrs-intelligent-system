@@ -1,12 +1,7 @@
 export type FuncionarioRole = 'ANALISTA' | 'SUPERVISOR' | 'MASTER';
 
 export type TicketType =
-  | 'PETITION'
-  | 'COMPLAINT'
-  | 'CLAIM'
-  | 'SUGGESTION'
-  | 'INFORMATION_REQUEST'
-  | 'CONSULTATION';
+  'PETITION' | 'COMPLAINT' | 'CLAIM' | 'SUGGESTION' | 'INFORMATION_REQUEST' | 'CONSULTATION';
 
 export type TicketPriority = 'HIGH' | 'MEDIUM' | 'LOW';
 
@@ -98,6 +93,7 @@ export interface TicketCreate {
 }
 
 export interface TicketResponse {
+  id?: string | null;
   tracking_number: string;
   status: TicketStatus | string;
   ticket_type: TicketType;
@@ -112,6 +108,82 @@ export interface TicketTypeChangeRequest {
   ticket_type: TicketType;
   responsible_user: string;
   change_reason?: string | null;
+}
+
+export interface TicketAreaReassignRequest {
+  area_id: string;
+  change_reason?: string | null;
+  responsible_user?: string | null;
+}
+
+export interface TicketPriorityChangeRequest {
+  priority: TicketPriority;
+  change_reason?: string | null;
+  responsible_user?: string | null;
+}
+
+export interface ClaimantDetailOut {
+  id: string;
+  document_type: string;
+  document_number: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string | null;
+}
+
+export interface TicketSLADetailOut {
+  filing_date: string;
+  due_date: string | null;
+  needs_sla_validation: boolean;
+  alert_level: AlertLevel | string;
+  days_remaining: number | null;
+  is_overdue: boolean;
+}
+
+export interface AIAuditSummaryOut {
+  id: string;
+  ai_model: string;
+  provider: string;
+  classification_source: string;
+  suggested_type: string;
+  suggested_priority: string;
+  suggested_area_code: string;
+  decision_justification: string;
+  confidence: number | null;
+  created_at: string;
+}
+
+export interface TimelineEventOut {
+  event_id: string;
+  source_type: 'AI_DECISION' | 'HUMAN_INTERVENTION';
+  visual_badge: 'IA' | 'HUMANO';
+  timestamp: string;
+  actor: string;
+  actor_id: string | null;
+  title: string;
+  description: string;
+  modified_field: string | null;
+  old_value: string | null;
+  new_value: string | null;
+  details: Record<string, unknown> | null;
+}
+
+export interface TicketDetailResponse {
+  id: string;
+  tracking_number: string;
+  original_text: string;
+  ticket_type: TicketType;
+  priority: TicketPriority;
+  status: TicketStatus | string;
+  created_at: string;
+  updated_at: string;
+  claimant: ClaimantDetailOut;
+  area: AreaSummary | null;
+  sla: TicketSLADetailOut;
+  clasificacion_ia: AIAuditSummaryOut | null;
+  justificacion_ia: string | null;
+  timeline: TimelineEventOut[];
 }
 
 export interface TicketListOut {
@@ -185,18 +257,27 @@ export interface StatsResponse {
   all_time: PeriodStats;
 }
 
-/**
- * TODO(backend-hu16): Agregar tipo para ChangeAudit y detalle completo cuando exista
- * GET /api/v1/pqrs/{tracking_number} con historial humano.
- */
-export interface ChangeAuditEvent {
-  id: string;
-  actor: 'IA' | 'HUMANO';
-  title: string;
-  subtitle: string;
-  timestamp: string;
-  justification?: string;
-  metadata?: Record<string, string | number | null | undefined>;
+export interface AreaMetricOut {
+  area_id: string | null;
+  area_code: string;
+  area_name: string;
+  total: number;
+}
+
+export interface SLAMetricsOut {
+  vencidas: number;
+  a_tiempo: number;
+  sin_fecha_sla: number;
+  porcentaje_a_tiempo: number;
+}
+
+export interface DashboardMetricsResponse {
+  total_pqrs: number;
+  por_tipo: Record<string, number>;
+  por_area: AreaMetricOut[];
+  por_prioridad: Record<string, number>;
+  cumplimiento_sla: SLAMetricsOut;
+  generated_at: string;
 }
 
 export interface NormalizedApiError {

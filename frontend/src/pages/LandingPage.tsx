@@ -32,10 +32,7 @@ export function LandingPage() {
         </div>
       </section>
 
-      <section
-        aria-label="Capacidades principales"
-        className="mt-16 grid gap-6 md:grid-cols-3"
-      >
+      <section aria-label="Capacidades principales" className="mt-16 grid gap-6 md:grid-cols-3">
         <Card>
           <CardHeader>
             <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">

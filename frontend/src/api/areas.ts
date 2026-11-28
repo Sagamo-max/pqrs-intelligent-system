@@ -20,9 +20,6 @@ export async function createArea(payload: AreaCreate): Promise<AreaOut> {
  * Nota: El backend implementa `PATCH /api/v1/areas/{area_id}` (no PUT) y exige rol MASTER.
  */
 export async function updateArea(areaId: string, payload: AreaUpdate): Promise<AreaOut> {
-  const { data } = await apiClient.patch<AreaOut>(
-    `/areas/${encodeURIComponent(areaId)}`,
-    payload,
-  );
+  const { data } = await apiClient.patch<AreaOut>(`/areas/${encodeURIComponent(areaId)}`, payload);
   return data;
 }

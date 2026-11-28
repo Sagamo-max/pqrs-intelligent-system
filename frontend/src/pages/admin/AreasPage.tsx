@@ -40,9 +40,7 @@ const areaSchema = z.object({
     .min(2, 'El nombre debe tener al menos 2 caracteres.')
     .max(100, 'Máximo 100 caracteres.'),
   description: z.string().trim().optional(),
-  manager_email: z
-    .union([z.string().trim().email('Correo inválido.'), z.literal('')])
-    .optional(),
+  manager_email: z.union([z.string().trim().email('Correo inválido.'), z.literal('')]).optional(),
   is_active: z.boolean(),
 });
 
@@ -220,7 +218,10 @@ export function AreasPage() {
 
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent>
-          <form onSubmit={handleSubmit((values) => saveMutation.mutate(values))} className="space-y-4">
+          <form
+            onSubmit={handleSubmit((values) => saveMutation.mutate(values))}
+            className="space-y-4"
+          >
             <DialogHeader>
               <DialogTitle>{editingArea ? 'Editar área' : 'Crear nueva área'}</DialogTitle>
               <DialogDescription>
@@ -280,11 +281,7 @@ export function AreasPage() {
                 name="is_active"
                 control={control}
                 render={({ field }) => (
-                  <Switch
-                    id="area-active"
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                  />
+                  <Switch id="area-active" checked={field.value} onCheckedChange={field.onChange} />
                 )}
               />
             </div>

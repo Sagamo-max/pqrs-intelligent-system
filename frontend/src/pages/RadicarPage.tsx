@@ -45,10 +45,7 @@ const radicarSchema = z.object({
     .string()
     .trim()
     .regex(/^\d{7,15}$/, 'Ingresa un teléfono numérico válido (7 a 15 dígitos).'),
-  free_text: z
-    .string()
-    .trim()
-    .min(15, 'Describe tu solicitud con al menos 15 caracteres.'),
+  free_text: z.string().trim().min(15, 'Describe tu solicitud con al menos 15 caracteres.'),
 });
 
 type RadicarFormValues = z.infer<typeof radicarSchema>;
@@ -62,7 +59,6 @@ const STEPS = [
 export function RadicarPage() {
   const [step, setStep] = useState(1);
   const [serverError, setServerError] = useState<string | null>(null);
-  const [requiresAuthNotice, setRequiresAuthNotice] = useState(false);
   const [createdTicket, setCreatedTicket] = useState<TicketResponse | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -109,7 +105,6 @@ export function RadicarPage() {
 
   const onSubmit = async (values: RadicarFormValues) => {
     setServerError(null);
-    setRequiresAuthNotice(false);
 
     try {
       const response = await createTicket({
@@ -126,9 +121,6 @@ export function RadicarPage() {
       toast.success(`PQRS radicada con código ${response.tracking_number}`);
     } catch (error) {
       const normalized = normalizeApiError(error);
-      if (normalized.status === 401) {
-        setRequiresAuthNotice(true);
-      }
       if (normalized.status === 422) {
         Object.entries(normalized.fieldErrors).forEach(([field, msg]) => {
           const mappedField = field.replace(/^claimant\./, '') as keyof RadicarFormValues;
@@ -319,19 +311,7 @@ export function RadicarPage() {
             {serverError ? (
               <Alert variant="destructive" role="alert" aria-live="assertive">
                 <AlertTitle>No se pudo radicar la PQRS</AlertTitle>
-                <AlertDescription className="space-y-2">
-                  <p>{serverError}</p>
-                  {requiresAuthNotice ? (
-                    <p className="text-xs">
-                      Nota técnica: el endpoint actual <code>POST /api/v1/pqrs/</code> exige
-                      sesión de funcionario en el backend. Puedes iniciar sesión en{' '}
-                      <Link to="/login" className="underline font-semibold">
-                        Acceso funcionarios
-                      </Link>{' '}
-                      sin perder los datos ingresados en esta pestaña.
-                    </p>
-                  ) : null}
-                </AlertDescription>
+                <AlertDescription>{serverError}</AlertDescription>
               </Alert>
             ) : null}
 
@@ -382,9 +362,7 @@ export function RadicarPage() {
                     id="document_number"
                     placeholder="Ej. 1020304050"
                     aria-invalid={Boolean(errors.document_number)}
-                    aria-describedby={
-                      errors.document_number ? 'document_number-error' : undefined
-                    }
+                    aria-describedby={errors.document_number ? 'document_number-error' : undefined}
                     {...register('document_number')}
                   />
                   {errors.document_number ? (

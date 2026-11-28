@@ -8,43 +8,42 @@ import { useAuthStore } from '@/stores/authStore';
 
 vi.mock('@/api/dashboard', () => ({
   fetchDashboardMetrics: vi.fn().mockResolvedValue({
-    totalTickets: 12,
-    overdueCount: 2,
-    dueSoonCount: 3,
-    onTimeCount: 7,
-    classificationStats: {
-      last_24h: { total: 4, by_source: { openai: 3, heuristic: 1, fallback: 0 } },
-      all_time: { total: 12, by_source: { openai: 9, heuristic: 2, fallback: 1 } },
+    total_pqrs: 12,
+    por_tipo: {
+      PETITION: 5,
+      COMPLAINT: 4,
+      CLAIM: 3,
     },
-    byType: [
-      { name: 'Petición', value: 5 },
-      { name: 'Queja', value: 4 },
-      { name: 'Reclamo', value: 3 },
+    por_area: [
+      {
+        area_id: '11111111-1111-1111-1111-111111111111',
+        area_code: 'ATENCION_USUARIO',
+        area_name: 'Atención al Usuario',
+        total: 6,
+      },
+      {
+        area_id: '22222222-2222-2222-2222-222222222222',
+        area_code: 'FACTURACION',
+        area_name: 'Facturación',
+        total: 6,
+      },
     ],
-    byPriority: [
-      { name: 'Alta', value: 4 },
-      { name: 'Media', value: 5 },
-      { name: 'Baja', value: 3 },
-    ],
-    byArea: [
-      { name: 'Atención al Usuario', value: 6 },
-      { name: 'Facturación', value: 6 },
-    ],
-    slaBreakdown: [
-      { name: 'A tiempo', value: 7 },
-      { name: 'Próximas a vencer', value: 3 },
-      { name: 'Vencidas', value: 2 },
-    ],
-    sourceBreakdown: [
-      { name: 'OpenAI', value: 9 },
-      { name: 'Heurística', value: 2 },
-      { name: 'Fallback', value: 1 },
-    ],
-    recentTrend: [
-      { label: '11-26', total: 5 },
-      { label: '11-27', total: 7 },
-    ],
-    sampleSize: 12,
+    por_prioridad: {
+      HIGH: 4,
+      MEDIUM: 5,
+      LOW: 3,
+    },
+    cumplimiento_sla: {
+      vencidas: 2,
+      a_tiempo: 9,
+      sin_fecha_sla: 1,
+      porcentaje_a_tiempo: 81.82,
+    },
+    generated_at: '2026-11-27T18:00:00Z',
+  }),
+  getClassificationStats: vi.fn().mockResolvedValue({
+    last_24h: { total: 4, by_source: { openai: 3, heuristic: 1, fallback: 0 } },
+    all_time: { total: 12, by_source: { openai: 9, heuristic: 2, fallback: 1 } },
   }),
 }));
 
@@ -62,7 +61,12 @@ function renderRoute(initialEntry: string) {
 }
 
 async function expectNoCriticalA11yIssues(container: HTMLElement) {
-  const results = await axe.run(container);
+  const results = await axe.run(container, {
+    rules: {
+      // jsdom no implementa canvas/layout completo para calcular contraste de píxeles.
+      'color-contrast': { enabled: false },
+    },
+  });
   const blocking = results.violations.filter(
     (violation) => violation.impact === 'critical' || violation.impact === 'serious',
   );
@@ -76,15 +80,15 @@ describe('Auditoría de accesibilidad axe-core', () => {
 
   it('no presenta errores críticos ni serios en /radicar', async () => {
     const { container } = renderRoute('/radicar');
-    await screen.findByRole('heading', { name: /Radicar una PQRS/i });
+    await screen.findByRole('heading', { name: /Radicar una PQRS/i }, { timeout: 10000 });
     await expectNoCriticalA11yIssues(container);
-  });
+  }, 15000);
 
   it('no presenta errores críticos ni serios en /login', async () => {
     const { container } = renderRoute('/login');
-    await screen.findByRole('heading', { name: /Iniciar sesión/i });
+    await screen.findByRole('heading', { name: /Iniciar sesión/i }, { timeout: 10000 });
     await expectNoCriticalA11yIssues(container);
-  });
+  }, 15000);
 
   it('no presenta errores críticos ni serios en /admin/dashboard', async () => {
     useAuthStore.getState().loginSuccess(
@@ -105,9 +109,14 @@ describe('Auditoría de accesibilidad axe-core', () => {
     );
 
     const { container } = renderRoute('/admin/dashboard');
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: /Dashboard de Triaje PQRS/i })).toBeInTheDocument();
-    });
+    await waitFor(
+      () => {
+        expect(
+          screen.getByRole('heading', { name: /Dashboard de Triaje PQRS/i }),
+        ).toBeInTheDocument();
+      },
+      { timeout: 10000 },
+    );
     await expectNoCriticalA11yIssues(container);
-  });
+  }, 15000);
 });

@@ -1,13 +1,17 @@
-import path from 'node:path';
 import react from '@vitejs/plugin-react';
-import { defineConfig } from 'vitest/config';
+import { defineConfig } from 'vite';
+
+const srcDir = decodeURIComponent(new URL('./src', import.meta.url).pathname).replace(
+  /^\/([A-Za-z]:)/,
+  '$1',
+);
 
 export default defineConfig({
   base: '/',
   plugins: [react()],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      '@': srcDir,
     },
   },
   build: {
@@ -46,10 +50,5 @@ export default defineConfig({
         },
       },
     },
-  },
-  test: {
-    environment: 'jsdom',
-    setupFiles: './src/test/setup.ts',
-    globals: true,
   },
 });

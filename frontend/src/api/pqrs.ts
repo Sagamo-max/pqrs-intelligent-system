@@ -1,19 +1,17 @@
 import { apiClient } from '@/api/client';
 import type {
   AIAuditOut,
+  TicketAreaReassignRequest,
   TicketCreate,
+  TicketDetailResponse,
   TicketListFilters,
   TicketListOut,
   TicketListResponse,
+  TicketPriorityChangeRequest,
   TicketResponse,
   TicketTypeChangeRequest,
 } from '@/types/api';
 
-/**
- * TODO(backend-public-radicar): `POST /api/v1/pqrs/` actualmente tiene `Depends(get_current_user)`
- * en `backend/app/routers/ticket.py`. Cuando el backend exponga la ruta como pública, /radicar
- * funcionará para ciudadanos sin iniciar sesión.
- */
 export async function createTicket(payload: TicketCreate): Promise<TicketResponse> {
   const { data } = await apiClient.post<TicketResponse>('/pqrs/', payload);
   return data;
@@ -46,18 +44,45 @@ export async function listTickets(filters: TicketListFilters = {}): Promise<Tick
   return data;
 }
 
-export async function findTicketByTracking(trackingNumber: string): Promise<TicketListOut | null> {
-  // TODO(backend-hu16): Reemplazar por `GET /api/v1/pqrs/{tracking_number}` cuando esté disponible.
-  const response = await listTickets({ limit: 100, offset: 0 });
-  return response.items.find((item) => item.tracking_number === trackingNumber) ?? null;
+export async function getTicketDetail(ticketId: string): Promise<TicketDetailResponse> {
+  const { data } = await apiClient.get<TicketDetailResponse>(
+    `/pqrs/${encodeURIComponent(ticketId)}`,
+  );
+  return data;
 }
 
-/**
- * Nota: El backend expone `GET /api/v1/pqrs/{tracking_number}/audit` (no `/auditoria-ia`).
- */
 export async function getTicketAudit(trackingNumber: string): Promise<AIAuditOut> {
   const { data } = await apiClient.get<AIAuditOut>(
     `/pqrs/${encodeURIComponent(trackingNumber)}/audit`,
+  );
+  return data;
+}
+
+export async function getTicketAiAuditHistory(ticketId: string): Promise<AIAuditOut[]> {
+  const { data } = await apiClient.get<AIAuditOut[]>(
+    `/pqrs/${encodeURIComponent(ticketId)}/auditoria-ia`,
+  );
+  return data;
+}
+
+export async function reassignTicketArea(
+  ticketId: string,
+  payload: TicketAreaReassignRequest,
+): Promise<TicketResponse> {
+  const { data } = await apiClient.patch<TicketResponse>(
+    `/pqrs/${encodeURIComponent(ticketId)}/area`,
+    payload,
+  );
+  return data;
+}
+
+export async function changeTicketPriority(
+  ticketId: string,
+  payload: TicketPriorityChangeRequest,
+): Promise<TicketResponse> {
+  const { data } = await apiClient.patch<TicketResponse>(
+    `/pqrs/${encodeURIComponent(ticketId)}/prioridad`,
+    payload,
   );
   return data;
 }
@@ -72,11 +97,3 @@ export async function changeTicketType(
   );
   return data;
 }
-
-/**
- * TODO(backend-hu15): Implementar consumo real de `PATCH /api/v1/pqrs/{ticket_id}/area`
- * cuando el endpoint exista en `backend/app/routers/ticket.py`.
- *
- * TODO(backend-hu18): Implementar consumo real de `PATCH /api/v1/pqrs/{ticket_id}/prioridad`
- * cuando el endpoint exista en `backend/app/routers/ticket.py`.
- */
